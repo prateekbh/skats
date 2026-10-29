@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>$GODOT_PROJECT_NAME</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;700&display=swap" rel="stylesheet">
+		<style>
+/* Loading screen: dusk over Megakat City while the TurboKat spools up. */
+:root {
+	--night: #0b0d1a;
+	--dusk-top: #17163f;
+	--dusk-mid: #6b2f5c;
+	--dusk-low: #f2794f;
+	--yellow: #ffd23f;
+	--orange: #ff6a1f;
+	--hud: #9dffb5;
+	--ink: #050508;
+	--display: 'Bungee', Impact, 'Arial Black', sans-serif;
+	--ui: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
+}
+
+html, body, #canvas { margin: 0; padding: 0; border: 0; }
+body { color: white; background-color: var(--night); overflow: hidden; touch-action: none; }
+#canvas { display: block; }
+#canvas:focus { outline: none; }
+
+#status {
+	position: absolute; inset: 0; overflow: hidden; visibility: hidden;
+	background: linear-gradient(to bottom, var(--dusk-top) 0%, var(--dusk-mid) 48%, var(--dusk-low) 78%, #3a1d2b 100%);
+	font-family: var(--ui);
+}
+#status-splash { display: none; }
+
+/* Searchlights sweeping the clouds. */
+.beam {
+	position: absolute; bottom: 18%; width: 9vw; height: 95vh; transform-origin: 50% 100%;
+	background: linear-gradient(to top, rgba(255, 240, 200, 0.28), rgba(255, 240, 200, 0));
+	clip-path: polygon(46% 100%, 54% 100%, 100% 0, 0 0);
+	animation: sweep 7s ease-in-out infinite alternate;
+}
+.beam.b1 { left: 18%; animation-duration: 6s; }
+.beam.b2 { left: 62%; animation-duration: 8s; animation-delay: -3s; }
+@keyframes sweep { from { transform: rotate(-28deg); } to { transform: rotate(24deg); } }
+
+/* Skyline silhouette with lit windows. */
+.skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 34vh; }
+.skyline svg { width: 100%; height: 100%; display: block; }
+
+/* The TurboKat flying a banking pass across the sky. */
+.jet {
+	position: absolute; top: 30%; left: -30vw; width: min(34vw, 380px);
+	animation: pass 5.5s cubic-bezier(.45, .05, .4, 1) infinite;
+	filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+}
+.jet svg { width: 100%; height: auto; display: block; }
+.flame { transform-origin: 0 50%; animation: flicker 0.08s steps(2) infinite alternate; }
+@keyframes flicker { from { transform: scaleX(1); opacity: 0.95; } to { transform: scaleX(0.75); opacity: 0.75; } }
+@keyframes pass {
+	0%   { transform: translate(0, 12vh) rotate(-6deg) scale(0.7); }
+	45%  { transform: translate(70vw, -6vh) rotate(4deg) scale(1); }
+	100% { transform: translate(150vw, -22vh) rotate(-14deg) scale(0.6); }
+}
+
+/* Logo slam. */
+.logo {
+	position: absolute; top: 9vh; left: 0; right: 0; text-align: center;
+	animation: slam 0.7s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+.logo h1 {
+	margin: 0; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em;
+	font-size: clamp(48px, 10vw, 128px); line-height: 0.9; color: var(--yellow);
+	transform: skew(-8deg);
+	text-shadow: 4px 4px 0 var(--orange), 8px 8px 0 var(--ink);
+}
+.logo p {
+	margin: 0.6em 0 0; font-weight: 700; letter-spacing: 0.4em; font-size: clamp(14px, 2.2vw, 24px);
+	text-shadow: 2px 2px 0 var(--ink);
+}
+@keyframes slam { from { transform: scale(2.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Radio chatter and the turbine spool gauge. */
+.panel {
+	position: absolute; left: 50%; bottom: 7vh; transform: translateX(-50%);
+	width: min(560px, calc(100vw - 32px)); box-sizing: border-box;
+	background: rgba(5, 8, 14, 0.78); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
+	padding: 14px 18px;
+}
+.radio { min-height: 3.2em; }
+.radio .who { color: var(--yellow); font-weight: 700; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
+.radio .line { font-size: 17px; margin-top: 2px; animation: type 0.4s ease-out; }
+@keyframes type { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.gauge { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.fan { width: 34px; height: 34px; flex: none; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.bar { flex: 1; height: 12px; background: #1b1f2e; border: 2px solid var(--ink); position: relative; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 0%; background: linear-gradient(90deg, var(--orange), var(--yellow)); transition: width 0.25s; }
+.bar.indeterminate i { width: 30%; animation: scan 1.1s ease-in-out infinite alternate; }
+@keyframes scan { from { left: 0; } to { left: 70%; } }
+.pct { color: var(--hud); font-weight: 700; font-size: 14px; min-width: 9.5em; text-align: right; font-variant-numeric: tabular-nums; }
+
+#status-notice {
+	display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+	background: #5b3943; border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
+	color: #f2e6e6; line-height: 1.4; padding: 1rem 1.4rem; text-align: center; z-index: 2;
+	width: min(520px, calc(100vw - 32px)); box-sizing: border-box;
+}
+.fine { position: absolute; bottom: 1.4vh; left: 0; right: 0; text-align: center; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+
+@media (prefers-reduced-motion: reduce) {
+	.beam, .jet, .flame, .fan, .logo, .bar.indeterminate i { animation: none; }
+	.jet { left: 50%; transform: translateX(-50%); }
+}
+		</style>
+		$GODOT_HEAD_INCLUDE
+	</head>
+	<body>
+		<canvas id="canvas">Your browser does not support the canvas tag.</canvas>
+		<noscript>Your browser does not support JavaScript.</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
+			<div class="beam b1"></div>
+			<div class="beam b2"></div>
+
+			<div class="jet" aria-hidden="true">
+				<!-- TurboKat, top view, nose to the right. -->
+				<svg viewBox="0 0 400 220">
+					<g class="flame">
+						<polygon points="58,84 0,92 58,100" fill="#ffb347"/>
+						<polygon points="58,120 0,128 58,136" fill="#ffb347"/>
+						<polygon points="58,88 22,92 58,96" fill="#dff1ff"/>
+						<polygon points="58,124 22,128 58,132" fill="#dff1ff"/>
+					</g>
+					<!-- wings -->
+					<polygon points="150,104 92,6 70,4 82,40 60,52 88,104" fill="#0e0e14" stroke="#000" stroke-width="3"/>
+					<polygon points="150,116 92,214 70,216 82,180 60,168 88,116" fill="#0e0e14" stroke="#000" stroke-width="3"/>
+					<polygon points="88,20 72,6 92,6 98,22" fill="#2f45d6"/>
+					<polygon points="88,200 72,214 92,214 98,198" fill="#2f45d6"/>
+					<polygon points="120,72 104,48 112,46 128,70" fill="#d81e14"/>
+					<polygon points="120,148 104,172 112,174 128,150" fill="#d81e14"/>
+					<!-- engines -->
+					<rect x="56" y="80" width="40" height="24" rx="6" fill="#d81e14" stroke="#000" stroke-width="3"/>
+					<rect x="56" y="116" width="40" height="24" rx="6" fill="#d81e14" stroke="#000" stroke-width="3"/>
+					<!-- fuselage -->
+					<polygon points="70,110 96,82 210,84 330,104 392,110 330,116 210,136 96,138" fill="#111118" stroke="#000" stroke-width="3"/>
+					<!-- tail fins (seen from above) -->
+					<polygon points="78,92 112,90 128,96 84,98" fill="#1d1d26" stroke="#000" stroke-width="2"/>
+					<polygon points="78,128 112,130 128,124 84,122" fill="#1d1d26" stroke="#000" stroke-width="2"/>
+					<!-- cockpit pod and glass -->
+					<polygon points="200,110 226,94 306,100 340,110 306,120 226,126" fill="#d81e14" stroke="#000" stroke-width="3"/>
+					<polygon points="232,104 266,98 300,104 300,116 266,122 232,116" fill="#3552e8"/>
+					<line x1="266" y1="98" x2="266" y2="122" stroke="#d81e14" stroke-width="4"/>
+					<line x1="240" y1="110" x2="300" y2="110" stroke="#d81e14" stroke-width="2"/>
+					<polygon points="380,108 398,110 380,112" fill="#2f45d6"/>
+				</svg>
+			</div>
+
+			<div class="skyline" aria-hidden="true">
+				<svg viewBox="0 0 1600 340" preserveAspectRatio="none">
+					<defs>
+						<pattern id="win" width="14" height="18" patternUnits="userSpaceOnUse">
+							<rect width="14" height="18" fill="#1a1426"/>
+							<rect x="4" y="5" width="6" height="8" fill="#ffcf73" opacity="0.75"/>
+						</pattern>
+					</defs>
+					<path fill="url(#win)" d="M0 340V190h60v-60h40v-40h30v40h50V170h70V60h20V30h12v30h20v110h60V120h80v-50h40v50h50V160h90V40h16V0h8v40h16v120h70V130h60v-80h70v80h40V180h80V110h50V70h30v40h40v70h80V140h60v40h50V100h70v80h60V150h80v190Z"/>
+					<path fill="#120d1c" d="M0 340V260h120v-30h90v30h160v-40h120v40h200v-20h140v20h210v-30h120v30h160v-40h120v40h160v80Z"/>
+				</svg>
+			</div>
+
+			<div class="logo">
+				<h1>SWAT KATS</h1>
+				<p>MEGAKAT SKIES</p>
+			</div>
+
+			<div class="panel">
+				<div class="radio" aria-live="polite">
+					<div class="who" id="radio-who">T-Bone</div>
+					<div class="line" id="radio-line">Hatch is open. Spinning up the turbines.</div>
+				</div>
+				<div class="gauge">
+					<svg class="fan" viewBox="0 0 40 40" aria-hidden="true">
+						<circle cx="20" cy="20" r="18" fill="#d81e14" stroke="#000" stroke-width="2"/>
+						<circle cx="20" cy="20" r="13" fill="#e8e8ee"/>
+						<g fill="#3a3c44">
+							<path d="M20 20 L18 8 L23 8Z"/><path d="M20 20 L31 17 L31 22Z"/><path d="M20 20 L22 32 L17 32Z"/><path d="M20 20 L9 23 L9 18Z"/>
+						</g>
+						<circle cx="20" cy="20" r="3" fill="#111"/>
+					</svg>
+					<div class="bar indeterminate" id="bar"><i></i></div>
+					<div class="pct" id="pct">SPOOLING UP</div>
+				</div>
+			</div>
+			<div class="fine">Unofficial non-commercial fan game · SWAT Kats © its owners</div>
+			<div id="status-notice"></div>
+		</div>
+
+		<script src="$GODOT_URL"></script>
+		<script>
+const GODOT_CONFIG = $GODOT_CONFIG;
+const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+const engine = new Engine(GODOT_CONFIG);
+
+// Radio chatter shown while the game downloads.
+const RADIO = [
+	['T-Bone', 'Hatch is open. Spinning up the turbines.'],
+	['Razor', 'Missiles loaded. Mega-Missile armed and ready.'],
+	['Callie Briggs', 'SWAT Kats, Megakat City needs you!'],
+	['T-Bone', 'Hang on to your tail, buddy!'],
+	['Commander Feral', 'Those vigilantes had better stay out of my airspace.'],
+	['Razor', 'Radar is hot. Creeplings inbound from the bay.'],
+];
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusNotice = document.getElementById('status-notice');
+	const bar = document.getElementById('bar');
+	const fill = bar.firstElementChild;
+	const pct = document.getElementById('pct');
+	const who = document.getElementById('radio-who');
+	const line = document.getElementById('radio-line');
+
+	let initializing = true;
+	let statusMode = '';
+	let radioIndex = 0;
+	const radioTimer = setInterval(() => {
+		radioIndex = (radioIndex + 1) % RADIO.length;
+		who.textContent = RADIO[radioIndex][0];
+		line.textContent = RADIO[radioIndex][1];
+		line.style.animation = 'none';
+		void line.offsetWidth; // restart the fade-in
+		line.style.animation = '';
+	}, 2600);
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			clearInterval(radioTimer);
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		text.split('\n').forEach((l) => {
+			statusNotice.appendChild(document.createTextNode(l));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		const missingMsg = 'This browser is missing features the game needs:\n';
+		displayFailureNotice(missingMsg + missing.join('\n') + '\nTry the latest Chrome, Edge or Firefox on a desktop computer.');
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					const p = Math.min(100, Math.round((current / total) * 100));
+					bar.classList.remove('indeterminate');
+					fill.style.width = p + '%';
+					pct.textContent = 'TURBINES ' + p + '%';
+				} else {
+					bar.classList.add('indeterminate');
+					pct.textContent = 'SPOOLING UP';
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>

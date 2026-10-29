@@ -47,6 +47,8 @@ func _process(delta: float) -> void:
 		var to_jet := (pos - global_position).normalized()
 		var cam_left := Vector3.UP.cross(to_jet).normalized()
 		_look(pos + cam_left * 13.0, Vector3.UP)
+	elif shot == "script":
+		pass # positioned by whoever is running a cutscene
 	elif shot.begins_with("view:"):
 		# Fixed local-space camera, used for showcase screenshots: "view:x,y,z".
 		var v := shot.trim_prefix("view:").split_floats(",")

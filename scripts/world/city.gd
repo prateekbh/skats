@@ -16,6 +16,8 @@ const WaterShader := preload("res://shaders/water.gdshader")
 var city_hall_pos := Vector3.ZERO
 var enforcer_hq_pos := Vector3.ZERO
 var salvage_yard_pos := Vector3(-1750.0, 0.0, 700.0)
+## The two sliding doors of the hidden hangar hatch (opened by the intro sequence).
+var hatch_doors: Array[Node3D] = []
 
 # Per-cell building footprint (centre, half extents) and roof height. Height 0 = empty lot.
 var _height := PackedFloat32Array()
@@ -43,6 +45,13 @@ func _ready() -> void:
 	_build_landmarks()
 	_build_salvage_yard()
 	_build_mountains()
+
+
+## Slides the hatch doors: 0 = closed, 1 = fully open.
+func set_hatch(open_amount: float) -> void:
+	for k in hatch_doors.size():
+		var sx := -1.0 if k == 0 else 1.0
+		hatch_doors[k].position.x = (10.0 + open_amount * 22.0) * sx
 
 
 func cell_index(x: float, z: float) -> int:
@@ -236,7 +245,12 @@ func _build_salvage_yard() -> void:
 		MeshKit.part(yard, MeshKit.box(s), MeshKit.toon(rust[n % rust.size()], 0.3, 0.8), p, Vector3(rng.randf_range(-0.3, 0.3), rng.randf(), rng.randf_range(-0.3, 0.3)))
 	# Hangar hatch with hazard edge.
 	MeshKit.part(yard, MeshKit.box(Vector3(46, 0.8, 46)), MeshKit.toon(Color(0.95, 0.75, 0.1)), Vector3(0, 0.7, 0))
-	MeshKit.part(yard, MeshKit.box(Vector3(40, 1.0, 40)), MeshKit.toon(Color(0.12, 0.12, 0.14)), Vector3(0, 0.9, 0))
+	# The shaft below shows as a black pit once the doors slide apart.
+	MeshKit.part(yard, MeshKit.box(Vector3(40, 0.1, 40)), MeshKit.glow(Color(0.01, 0.01, 0.015)), Vector3(0, 1.16, 0))
+	for sx in [-1.0, 1.0]:
+		var door := MeshKit.part(yard, MeshKit.box(Vector3(20, 1.0, 40)), MeshKit.toon(Color(0.12, 0.12, 0.14)), Vector3(10.0 * sx, 1.4, 0))
+		MeshKit.part(door, MeshKit.box(Vector3(2.0, 0.1, 40)), MeshKit.toon(Color(0.95, 0.75, 0.1)), Vector3(-9.0 * sx, 0.52, 0))
+		hatch_doors.append(door)
 	# The tow-truck crane.
 	MeshKit.part(yard, MeshKit.box(Vector3(3, 60, 3)), MeshKit.toon(Color(0.8, 0.55, 0.1)), Vector3(70, 30, -60))
 	MeshKit.part(yard, MeshKit.box(Vector3(60, 3, 3)), MeshKit.toon(Color(0.8, 0.55, 0.1)), Vector3(48, 60, -60))

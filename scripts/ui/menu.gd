@@ -85,6 +85,61 @@ func _panel_box() -> StyleBoxFlat:
 	return sb
 
 
+## Intro overlay: a skip hint, then (via slam_logo) the logo crashing onto the screen.
+func show_intro() -> void:
+	hide_all()
+	visible = true
+	var root := Control.new()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(root)
+	_screen = root
+	var hint := _label(root, "PRESS ANY KEY TO SKIP", 14, Color(1, 1, 1, 0.6))
+	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	hint.offset_left = -200
+	hint.offset_right = 200
+	hint.offset_top = -44
+	hint.offset_bottom = -20
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+func slam_logo() -> void:
+	if _screen == null:
+		return
+	var flash := ColorRect.new()
+	flash.color = Color(1, 0.95, 0.85, 0.85)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_screen.add_child(flash)
+	var title := _label(_screen, "SWAT KATS", 120, YELLOW)
+	title.add_theme_color_override("font_outline_color", ORANGE)
+	title.add_theme_constant_override("outline_size", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	title.offset_left = -560
+	title.offset_right = 560
+	title.offset_top = -180
+	title.offset_bottom = -20
+	title.pivot_offset = Vector2(560, 80)
+	var sub := _label(_screen, "MEGAKAT  SKIES", 32, TEXT)
+	sub.add_theme_color_override("font_outline_color", INK)
+	sub.add_theme_constant_override("outline_size", 8)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	sub.offset_left = -400
+	sub.offset_right = 400
+	sub.offset_top = -10
+	sub.offset_bottom = 40
+	sub.modulate.a = 0.0
+	title.scale = Vector2.ONE * 2.6
+	title.modulate.a = 0.0
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(flash, "color:a", 0.0, 0.45)
+	tw.tween_property(title, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(title, "modulate:a", 1.0, 0.2)
+	tw.tween_property(sub, "modulate:a", 1.0, 0.4).set_delay(0.45)
+
+
 func hide_all() -> void:
 	if _screen:
 		_screen.queue_free()

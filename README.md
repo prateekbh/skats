@@ -36,6 +36,7 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 ## What's in v0.1
 
 - **The TurboKat:** a community 3D model painted in the show's colours (glossy black, red cockpit pod with royal-blue glass, blue wingtips and nose, red engines with spinning turbines). Its wings swing back at high speed and spread open when slow, and it's cel-shaded with cartoon outlines. A procedural fallback airframe is built if the model files are missing.
+- **Launch sequence:** a themed browser loading screen (searchlights, TurboKat flyby, radio chatter, turbine spool-up gauge), then an in-game intro where the salvage-yard hatch opens, the TurboKat rises out and blasts off as the logo slams in.
 - **Arcade flight model:** bank-to-turn, auto-level, afterburner, speed gained in dives and lost in climbs.
 - **Weapons:** twin cannons with overheat, lock-on homing missiles, and the Mega-Missile.
 - **Megakat City:** procedural downtown with lit windows, street lamps, Enforcer HQ, City Hall, the bay, and the salvage yard where the hidden hangar is.

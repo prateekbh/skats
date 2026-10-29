@@ -8,9 +8,10 @@ extends Node
 ##   --shots=<dir>         save screenshots to <dir> during the autotest (needs a display)
 ##   --god                 invulnerable player with perfect aim (tests mission logic, not skill)
 ##   --snap=<file.png>     save a screenshot of the title screen after 4 s, then quit
+##                         (add --intro to capture the launch cinematic, --snap-at=<s> to pick the moment)
 ##   --showcase=<dir>      photograph the TurboKat from several angles into <dir>, then quit
 
-enum State { TITLE, PLAYING, PAUSED, DEBRIEF }
+enum State { INTRO, TITLE, PLAYING, PAUSED, DEBRIEF }
 
 const HUD := preload("res://scripts/ui/hud.gd")
 const Menu := preload("res://scripts/ui/menu.gd")
@@ -38,6 +39,10 @@ var _test_t := 0.0
 var _report_t := 0.0
 var _shot_times := [3.0, 9.0, 20.0, 45.0, 80.0]
 
+# Launch cinematic shown once per session before the title screen.
+var _intro_seq := -1.0
+var _intro_events := {}
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -51,8 +56,10 @@ func _ready() -> void:
 		_showcase.call_deferred()
 	elif _autotest:
 		start_episode(Game.episode_by_id(_opts.get("episode", "ep01")))
-	else:
+	elif _opts.has("snap") and not _opts.has("intro"):
 		_show_title()
+	else:
+		_start_intro()
 
 
 # --- world ------------------------------------------------------------------------
@@ -272,6 +279,11 @@ func _resume() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if state == State.INTRO:
+		var pressed := (event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton) and event.is_pressed()
+		if pressed and _intro_seq > 0.5:
+			_finish_intro()
+		return
 	if event.is_action_pressed("pause"):
 		if state == State.PLAYING:
 			_pause()
@@ -298,6 +310,8 @@ func _process(delta: float) -> void:
 		Engine.time_scale = 1.0
 
 	match state:
+		State.INTRO:
+			_intro_step(delta)
 		State.TITLE, State.DEBRIEF:
 			if player.alive and not player.player_control:
 				_cruise()
@@ -321,7 +335,7 @@ func _process(delta: float) -> void:
 	elif _opts.has("snap"):
 		# --snap=<file.png> saves one frame after 4 seconds (e.g. the title screen), then quits.
 		_test_t += delta
-		if _test_t > 4.0:
+		if _test_t > float(_opts.get("snap-at", "4")):
 			get_viewport().get_texture().get_image().save_png(_opts.snap)
 			get_tree().quit()
 
@@ -352,6 +366,88 @@ func _showcase() -> void:
 		img.save_png("%s/%s.png" % [_opts.showcase, v_name])
 		print("[showcase] ", v_name)
 	get_tree().quit()
+
+
+# --- launch cinematic -------------------------------------------------------------------
+
+## The TurboKat rises out of the salvage-yard hangar and blasts off over Megakat City.
+func _start_intro() -> void:
+	state = State.INTRO
+	_intro_seq = 0.0
+	_intro_events = {}
+	_clear_world()
+	hud.visible = false
+	var yard := city.salvage_yard_pos
+	player.reset(yard + Vector3(0, -14, 0), Vector3(0, -14, 0))
+	player.set_process(false)
+	player.throttle = 0.2
+	player.boosting = false
+	city.set_hatch(0.0)
+	camera.shot = "script"
+	menu.show_intro()
+
+
+func _intro_step(delta: float) -> void:
+	_intro_seq += delta
+	var t := _intro_seq
+	var yard := city.salvage_yard_pos
+	var fwd := player.forward()
+	_intro_once("alarm", 0.4, func(): Sfx.play("alarm", -10.0))
+	city.set_hatch(smoothstep(0.8, 2.2, t))
+	if t < 4.4:
+		# Rise out of the shaft, then hover with a little bob and the nose lifting.
+		var rise := smoothstep(1.9, 3.9, t)
+		var bob := sin(t * 3.0) * 0.4 * smoothstep(3.6, 4.0, t)
+		var base := yard + Vector3(0, lerpf(-14.0, 24.0, rise) + bob, 0)
+		player.global_position = base
+		var flat := Vector3(-yard.x, 0, -yard.z).normalized()
+		var nose_up := deg_to_rad(14.0) * smoothstep(3.7, 4.4, t)
+		player.look_at(base + flat + Vector3.UP * tan(nose_up), Vector3.UP)
+		player.throttle = lerpf(0.15, 0.6, smoothstep(2.0, 4.4, t))
+		player.speed = 0.0
+		_intro_once("dust", 2.1, func(): combat._burst(yard + Vector3(0, 2, 0), combat._smoke_mat, 30, 2.5, Vector2(10, 30), Vector2(10, 18), 2.5, [Color(0.5, 0.42, 0.35, 0.0), Color(0.45, 0.38, 0.32, 0.6), Color(0.4, 0.35, 0.3, 0.0)], Vector3(0, 4, 0), 1.0))
+		# Low corner of the yard, slowly dollying in on the hatch.
+		var cam_from := yard + Vector3(70, 10, 55)
+		var cam_to := yard + Vector3(48, 16, 38)
+		camera.global_position = cam_from.lerp(cam_to, smoothstep(0.0, 4.4, t))
+		camera.look_at(yard + Vector3(0, lerpf(2.0, 20.0, smoothstep(1.5, 4.0, t)), 0), Vector3.UP)
+	else:
+		# Afterburners: accelerate away in a climb, camera swinging in behind.
+		_intro_once("launch", 4.4, func():
+			Sfx.play("missile", 2.0, 0.6)
+			Sfx.play("boom", -2.0, 0.7)
+			camera.add_shake(1.6))
+		_intro_once("logo", 5.0, menu.slam_logo)
+		player.boosting = true
+		player.throttle = 1.0
+		player.speed = minf(player.speed + 160.0 * delta, 300.0)
+		player.global_position += fwd * player.speed * delta
+		var k := smoothstep(4.4, 6.0, t)
+		var behind := player.global_position - fwd * 26.0 + Vector3.UP * 7.0
+		var side := yard + Vector3(48, 16, 38)
+		camera.global_position = side.lerp(behind, k)
+		camera.look_at(player.global_position + fwd * 20.0 * k, Vector3.UP)
+	player._effects(delta)
+	Sfx.set_engine(true, player.throttle, 1.0 if player.boosting else 0.0)
+	if t > 8.0:
+		_finish_intro()
+
+
+func _intro_once(key: String, at: float, cb: Callable) -> void:
+	if _intro_seq >= at and not _intro_events.has(key):
+		_intro_events[key] = true
+		cb.call()
+
+
+func _finish_intro() -> void:
+	if state != State.INTRO:
+		return
+	_intro_seq = -1.0
+	player.set_process(true)
+	player.boosting = false
+	city.set_hatch(0.0)
+	Sfx.set_engine(false, 0, 0)
+	_show_title()
 
 
 # --- autopilot (title screen flyby and automated tests) -----------------------------
