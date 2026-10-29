@@ -572,8 +572,20 @@ func _autopilot_fight() -> void:
 	player.ai.missile = player.locked and randf() < 0.02
 
 
+var _six_t := 0.0
+var _six_streak := 0.0
+var _six_max := 0.0
+
+
 func _autotest_step(delta: float) -> void:
 	_test_t += delta / maxf(Engine.time_scale, 0.01)
+	# Dogfight metric: how long an attacker sits behind the player without a break.
+	if state == State.PLAYING and hud._bandit_on_six(player) != null:
+		_six_t += delta
+		_six_streak += delta
+		_six_max = maxf(_six_max, _six_streak)
+	else:
+		_six_streak = 0.0
 	_report_t -= delta
 	if _report_t <= 0.0 and mission:
 		_report_t = 3.0
@@ -596,5 +608,6 @@ func _autotest_step(delta: float) -> void:
 				img.save_png(path)
 				print("[autotest] saved ", path)
 	if _test_t >= float(_opts.get("seconds", "150")):
+		print("[autotest] bandit-on-six total %.1fs, longest unbroken %.1fs" % [_six_t, _six_max])
 		print("[autotest] time limit reached")
 		get_tree().quit(1)

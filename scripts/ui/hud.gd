@@ -174,11 +174,39 @@ func _draw() -> void:
 	if p.overheated:
 		_text(Vector2(c.x - 200, wy), "GUNS OVERHEATED", 20, RED, HORIZONTAL_ALIGNMENT_CENTER, 400)
 		wy += 26
+	var six := _bandit_on_six(p)
+	if six:
+		var arrow_c := Vector2(c.x, vs.y * 0.82)
+		var d := (six.global_position - p.global_position)
+		var local := p.global_transform.basis.inverse() * d
+		var dir2 := Vector2(local.x, local.z).normalized() # +z is behind the jet
+		draw_colored_polygon(PackedVector2Array([arrow_c + dir2 * 26, arrow_c - dir2 * 10 + Vector2(-dir2.y, dir2.x) * 14, arrow_c - dir2 * 10 - Vector2(-dir2.y, dir2.x) * 14]), RED)
+		if blink:
+			_text(Vector2(c.x - 250, wy), "BANDIT ON YOUR SIX - BREAK!", 22, RED, HORIZONTAL_ALIGNMENT_CENTER, 500)
+		wy += 28
+	if p.airbrake:
+		_text(Vector2(c.x - 200, wy), "AIRBRAKE", 16, AMBER, HORIZONTAL_ALIGNMENT_CENTER, 400)
+		wy += 22
 	if p.warn_boundary and blink:
 		_text(Vector2(c.x - 250, wy), "RETURN TO MEGAKAT CITY", 22, AMBER, HORIZONTAL_ALIGNMENT_CENTER, 500)
 
 	_draw_radar(p, Vector2(110 * ui + 10, vs.y - 110 * ui - 10), 95 * ui)
 	_draw_status(p, Vector2(vs.x - 300 * ui - 20, vs.y - 150 * ui - 10), ui)
+
+
+## The nearest attacker sitting behind the jet within gun range, if any.
+func _bandit_on_six(p: TurboKat) -> Target:
+	var best: Target = null
+	var best_d := 520.0
+	for t: Target in main.combat.targets:
+		if not is_instance_valid(t) or not t.alive or not (t is Creepling):
+			continue
+		var d := t.global_position - p.global_position
+		var dist := d.length()
+		if dist < best_d and p.forward().dot(d / dist) < -0.55 and (t as Creepling)._mode == "attack":
+			best = t
+			best_d = dist
+	return best
 
 
 ## Anime-style speed lines streaking in from the screen edges while on afterburner.
@@ -328,8 +356,10 @@ func _draw_status(p: TurboKat, o: Vector2, ui: float) -> void:
 	_bar(o + Vector2(0, 34 * ui), w, "AFTERBURNER", p.boost / 100.0, Color(0.5, 0.8, 1.0), ui)
 	_bar(o + Vector2(0, 68 * ui), w, "GUN HEAT", p.heat / 100.0, RED if p.overheated else AMBER, ui)
 	var y := o.y + 110 * ui
-	_text(Vector2(o.x, y), "MISSILES  %02d" % p.missiles, 18, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
-	_text(Vector2(o.x + w * 0.55, y), "MEGA  %d" % p.mega, 18, AMBER, HORIZONTAL_ALIGNMENT_LEFT)
+	_text(Vector2(o.x, y), "[F] MISSILES  %02d" % p.missiles, 16, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
+	var sp := p.selected_special()
+	var cycle_hint := "  [Q] NEXT" if Arsenal.SPECIALS.size() > 1 else ""
+	_text(Vector2(o.x + w * 0.5, y), "[R] %s  x%d%s" % [str(sp.name).to_upper(), p.special_ammo.get(sp.id, 0), cycle_hint], 13, AMBER, HORIZONTAL_ALIGNMENT_LEFT)
 	var lock_txt := "LOCKED" if p.locked else ("LOCKING" if p.lock_target else "NO LOCK")
 	_text(Vector2(o.x, y + 24 * ui), lock_txt, 13, RED if p.locked else GREEN_DIM, HORIZONTAL_ALIGNMENT_LEFT)
 

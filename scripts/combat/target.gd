@@ -20,6 +20,8 @@ var velocity := Vector3.ZERO
 var is_objective := false
 ## Materials that flash white when hit (should be unique to this target).
 var flash_materials: Array[StandardMaterial3D] = []
+## Seconds left disabled by a stun missile: no AI, no firing.
+var stunned := 0.0
 var _flash := 0.0
 
 
@@ -30,11 +32,25 @@ func _process(delta: float) -> void:
 		for m in flash_materials:
 			m.emission_energy_multiplier = e
 	if alive:
-		tick(delta)
+		if stunned > 0.0:
+			stunned -= delta
+			stunned_tick(delta)
+		else:
+			tick(delta)
 
 
 func tick(_dt: float) -> void:
 	pass
+
+
+## Called instead of tick() while stunned. Subclasses can drift or tumble here.
+func stunned_tick(_dt: float) -> void:
+	pass
+
+
+func stun(seconds: float) -> void:
+	if alive:
+		stunned = maxf(stunned, seconds)
 
 
 func set_max_hp(value: float) -> void:
@@ -46,10 +62,11 @@ func hit_test(p0: Vector3, p1: Vector3) -> bool:
 	return Combat.seg_sphere(p0, p1, global_position, radius)
 
 
-func take_damage(amount: float, point: Vector3) -> void:
+## `pierce` damages even invulnerable (armored) targets.
+func take_damage(amount: float, point: Vector3, pierce := false) -> void:
 	if not alive:
 		return
-	if invulnerable:
+	if invulnerable and not pierce:
 		combat.armor_ping(point)
 		return
 	hp -= amount

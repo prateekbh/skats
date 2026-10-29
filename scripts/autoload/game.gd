@@ -129,6 +129,7 @@ func _setup_input() -> void:
 	_bind("fire_guns", [KEY_SPACE], [JOY_BUTTON_A], [], [MOUSE_BUTTON_LEFT])
 	_bind("fire_missile", [KEY_F], [JOY_BUTTON_B], [], [MOUSE_BUTTON_RIGHT])
 	_bind("fire_special", [KEY_R], [JOY_BUTTON_X])
+	_bind("cycle_special", [KEY_Q], [JOY_BUTTON_LEFT_SHOULDER])
 	_bind("camera_cycle", [KEY_C], [JOY_BUTTON_Y])
 	_bind("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START])
 	_bind("toggle_invert", [KEY_Y])

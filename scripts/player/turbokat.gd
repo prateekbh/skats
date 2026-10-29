@@ -25,7 +25,9 @@ var heat := 0.0
 var overheated := false
 var missiles := 16
 var max_missiles := 16
-var mega := 3
+## Special-missile rack (see Arsenal): ammo per weapon id and the selected slot.
+var special_ammo := {}
+var special_index := 0
 var alive := true
 var boosting := false
 
@@ -42,6 +44,8 @@ var locked := false
 
 var warn_pull_up := false
 var warn_boundary := false
+## Holding throttle-down at idle deploys the airbrake: hard deceleration, tighter turns.
+var airbrake := false
 
 var _in := {"pitch": 0.0, "roll": 0.0, "yaw": 0.0}
 var _gun_cd := 0.0
@@ -99,7 +103,10 @@ func reset(pos: Vector3, look_target: Vector3) -> void:
 	heat = 0.0
 	overheated = false
 	missiles = max_missiles
-	mega = 3
+	special_ammo.clear()
+	for def in Arsenal.SPECIALS:
+		special_ammo[def.id] = def.ammo
+	special_index = 0
 	alive = true
 	visible = true
 	lock_target = null
@@ -160,9 +167,14 @@ func _fly(dt: float) -> void:
 	_in.yaw = lerpf(_in.yaw, yaw, k)
 
 	boosting = want_boost and boost > 1.0
+	airbrake = player_control and not boosting and throttle <= 0.01 and Input.is_action_pressed("throttle_down")
 	boost = maxf(0.0, boost - 28.0 * dt) if boosting else minf(100.0, boost + 10.0 * dt)
 
-	var authority := clampf(speed / 130.0, 0.45, 1.1)
+	# Turn rate peaks at a "corner speed" of about 110-200 m/s, like a real fighter: slow
+	# down to out-turn a bandit, and the airbrake tightens it further.
+	var authority := clampf(speed / 110.0, 0.5, 1.25) * (1.0 - clampf((speed - 200.0) / 400.0, 0.0, 0.25))
+	if airbrake:
+		authority *= 1.2
 	var b := global_transform.basis
 	b = b * Basis(Vector3.RIGHT, _in.pitch * 1.55 * authority * dt)
 	b = b * Basis(Vector3.BACK, -_in.roll * 2.9 * authority * dt)
@@ -189,6 +201,9 @@ func _fly(dt: float) -> void:
 	fwd = forward()
 
 	var target_speed := 60.0 + throttle * 135.0 + (130.0 if boosting else 0.0)
+	if airbrake:
+		target_speed = 45.0
+		speed = move_toward(speed, target_speed, 45.0 * dt)
 	speed = lerpf(speed, target_speed, 1.0 - exp(-dt * 0.9))
 	speed -= fwd.y * 45.0 * dt # climbing bleeds speed, diving gains it
 	speed = clampf(speed, MIN_SPEED, MAX_SPEED)
@@ -234,10 +249,18 @@ func _weapons(dt: float) -> void:
 		_missile_side = -_missile_side
 		var pos := global_transform * Vector3(4.0 * _missile_side, -1.2, -0.5)
 		combat.fire_missile(pos, forward(), speed, lock_target if locked else null)
-	if player_control and Input.is_action_just_pressed("fire_special") and mega > 0 and _missile_cd <= 0.0:
-		mega -= 1
+	if player_control and Input.is_action_just_pressed("cycle_special") and Arsenal.SPECIALS.size() > 1:
+		special_index = (special_index + 1) % Arsenal.SPECIALS.size()
+		Sfx.play("beep", -8.0, 0.8)
+	var special := selected_special()
+	if player_control and Input.is_action_just_pressed("fire_special") and special_ammo.get(special.id, 0) > 0 and _missile_cd <= 0.0:
+		special_ammo[special.id] -= 1
 		_missile_cd = 0.6
-		combat.fire_missile(global_transform * Vector3(0, -1.8, -1.0), forward(), speed, lock_target if locked else null, true)
+		combat.fire_missile(global_transform * Vector3(0, -1.8, -1.0), forward(), speed, lock_target if locked else null, special)
+
+
+func selected_special() -> Dictionary:
+	return Arsenal.SPECIALS[special_index]
 
 
 func _fire_gun() -> void:
@@ -355,7 +378,8 @@ func collect(kind: String) -> void:
 		hp = minf(max_hp, hp + 35.0)
 	else:
 		missiles = max_missiles
-		mega = mini(mega + 1, 5)
+		for def in Arsenal.SPECIALS:
+			special_ammo[def.id] = mini(special_ammo.get(def.id, 0) + 1, def.max)
 
 
 func crash() -> void:

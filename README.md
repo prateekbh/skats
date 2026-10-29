@@ -26,8 +26,10 @@ arcade jet combat, lock-on missiles and big set-piece bosses, playable in a web 
 | Throttle | W / S | RT / LT |
 | Afterburner | Shift | RB |
 | Cannon | Space / Left click | A |
-| Missile (lock first) | F / Right click | B |
-| Mega-Missile | R | X |
+| Homing missile (lock first) | F / Right click | B |
+| Special missile (Mega-Missile, more to come) | R | X |
+| Next special missile | Q | LB |
+| Airbrake (tighter turns) | Hold S at idle | Hold LT at idle |
 | Camera (chase / far / cockpit) | C | Y |
 | Invert pitch · Mute · Pause | Y · M · Esc | Start |
 

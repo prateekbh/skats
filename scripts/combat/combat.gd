@@ -24,8 +24,8 @@ var _missiles: Array[Dictionary] = []
 var _pickups: Array[Node3D] = []
 var _player_mm: MultiMesh
 var _enemy_mm: MultiMesh
-var _missile_pool: Array[Node3D] = []
-var _mega_pool: Array[Node3D] = []
+## Reusable missile bodies, keyed by weapon id.
+var _missile_pools := {}
 ## Pooled cartoon effects (explosions, hit stars, smoke trails).
 var vfx: VFX
 var _armor_ping_cd := 0.0
@@ -209,26 +209,33 @@ func _draw_bullets() -> void:
 
 # --- missiles ---------------------------------------------------------------------
 
-## Fires a homing missile. `target` may be null (dumb-fire). `mega` = big special missile.
-## Missile bodies are pooled and reused; their exhaust is drawn by the VFX puff pool.
-func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Target, mega := false) -> void:
-	var pool: Array[Node3D] = _mega_pool if mega else _missile_pool
-	var node: Node3D = pool.pop_back() if not pool.is_empty() else _build_missile(mega)
+## Fires a missile described by `def` (see Arsenal; defaults to the homing missile).
+## `target` may be null (dumb-fire). Missile bodies are pooled per type and reused;
+## their exhaust is drawn by the VFX puff pool.
+func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Target, def: Dictionary = {}) -> void:
+	if def.is_empty():
+		def = Arsenal.HOMING
+	var id: String = def.id
+	if not _missile_pools.has(id):
+		_missile_pools[id] = []
+	var pool: Array = _missile_pools[id]
+	var node: Node3D = pool.pop_back() if not pool.is_empty() else _build_missile(def)
 	node.visible = true
 	node.global_position = pos
 	safe_look(node, dir)
 	_missiles.append({
-		"node": node, "dir": dir.normalized(), "speed": launch_speed + 30.0,
-		"target": target, "life": 7.0, "mega": mega, "arm": 0.15, "trail": 0.0,
+		"node": node, "def": def, "dir": dir.normalized(), "speed": launch_speed + 30.0,
+		"target": target, "life": 7.0, "arm": 0.15, "trail": 0.0,
 	})
-	Sfx.play("missile", -2.0 if mega else -5.0, 0.8 if mega else 1.0)
+	var big: bool = def.size > 1.2
+	Sfx.play("missile", -2.0 if big else -5.0, 0.8 if big else 1.0)
 
 
-func _build_missile(mega: bool) -> Node3D:
+func _build_missile(def: Dictionary) -> Node3D:
 	var node := Node3D.new()
 	add_child(node)
-	var body_mat := MeshKit.toon(Color(0.9, 0.9, 0.92) if not mega else Color(0.95, 0.75, 0.15), 0.4, 0.4)
-	var s := 1.8 if mega else 1.0
+	var s: float = def.size
+	var body_mat := MeshKit.toon(def.color, 0.4, 0.4)
 	MeshKit.part(node, MeshKit.cyl(0.25 * s, 0.25 * s, 3.2 * s, 8), body_mat, Vector3.ZERO, Vector3(-PI / 2, 0, 0))
 	MeshKit.part(node, MeshKit.cyl(0.0, 0.25 * s, 0.8 * s, 8), MeshKit.toon(Color(0.9, 0.2, 0.15)), Vector3(0, 0, -2.0 * s), Vector3(-PI / 2, 0, 0))
 	MeshKit.part(node, MeshKit.sphere(0.5 * s, 8), MeshKit.glow(Color(1.0, 0.7, 0.3), true), Vector3(0, 0, 1.8 * s))
@@ -238,52 +245,70 @@ func _build_missile(mega: bool) -> Node3D:
 func _recycle_missile(m: Dictionary) -> void:
 	var node: Node3D = m.node
 	node.visible = false
-	(_mega_pool if m.mega else _missile_pool).append(node)
+	_missile_pools[m.def.id].append(node)
 
 
 func _update_missiles(dt: float) -> void:
 	for i in range(_missiles.size() - 1, -1, -1):
 		var m := _missiles[i]
+		var def: Dictionary = m.def
 		var node: Node3D = m.node
 		m.life -= dt
 		m.arm -= dt
-		m.speed = minf(m.speed + 380.0 * dt, 560.0 if not m.mega else 420.0)
+		m.speed = minf(m.speed + 380.0 * dt, def.speed)
 		var tgt = m.target
 		if tgt != null and (not is_instance_valid(tgt) or not tgt.alive):
 			m.target = null
 			tgt = null
 		if tgt != null and m.arm <= 0.0:
 			var to: Vector3 = (tgt.global_position - node.global_position).normalized()
-			m.dir = steer(m.dir, to, (2.8 if not m.mega else 1.8) * dt)
+			m.dir = steer(m.dir, to, def.turn * dt)
 		var p0 := node.global_position
 		var p1: Vector3 = p0 + m.dir * m.speed * dt
 		node.global_position = p1
 		safe_look(node, m.dir)
 		# Exhaust: a puff every few metres of flight.
+		var big: bool = def.size > 1.2
 		m.trail += m.speed * dt
-		var spacing := 4.0 if m.mega else 5.0
+		var spacing := 4.0 if big else 5.0
 		while m.trail >= spacing:
 			m.trail -= spacing
-			vfx.trail(p1 - m.dir * m.trail, m.mega)
-		var boom := false
+			vfx.trail(p1 - m.dir * m.trail, big)
+		var hit: Target = null
 		if m.arm <= 0.0:
 			for t in targets:
 				if t.alive and (t.hit_test(p0, p1) or Combat.seg_sphere(p0, p1, t.global_position, t.radius + 3.0)):
-					t.take_damage(450.0 if m.mega else 120.0, p1)
-					boom = true
+					hit = t
 					break
-		if not boom and (p1.y < city.height_at(p1.x, p1.z) or m.life <= 0.0):
-			boom = true
-		if boom:
-			if m.mega:
-				explode(p1, 3.2)
-				for t in targets:
-					if t.alive and t.global_position.distance_to(p1) < 90.0 + t.radius:
-						t.take_damage(220.0, t.global_position)
-			else:
-				explode(p1, 1.2)
+		if hit or p1.y < city.height_at(p1.x, p1.z) or m.life <= 0.0:
+			_missile_hit(def, p1, hit)
 			_recycle_missile(m)
 			_missiles.remove_at(i)
+
+
+## Applies a missile's effect where it detonated. `hit` is null for ground or timeout.
+func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
+	match def.behaviour:
+		"blast":
+			explode(p, 3.2)
+			if hit:
+				hit.take_damage(def.damage, p)
+			for t in targets:
+				if t.alive and t.global_position.distance_to(p) < def.blast_radius + t.radius:
+					t.take_damage(def.blast_damage, t.global_position)
+		"stun":
+			vfx.hit(p, 2.0)
+			if hit:
+				hit.take_damage(def.get("damage", 0.0), p)
+				hit.stun(def.stun)
+		"pierce":
+			explode(p, 1.4)
+			if hit:
+				hit.take_damage(def.damage, p, true)
+		_:
+			explode(p, 1.2)
+			if hit:
+				hit.take_damage(def.damage, p)
 
 
 # --- effects (drawn by the pooled VFX system) -----------------------------------------
