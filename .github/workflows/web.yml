@@ -29,10 +29,17 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           unzip -q -j templates.tpz 'templates/web_*' -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
 
+      # God-mode autopilot plays Episode 1. Exit 0 = mission won, 1 = time limit reached
+      # (both fine); anything else (mission failed, crash) fails the build.
       - name: Smoke test (autopilot plays Episode 1 for 60 s)
         run: |
           godot --headless --path . --import
-          godot --headless --path . -- --autotest --seconds=60 || [ $? -le 2 ]
+          set +e
+          godot --headless --path . -- --autotest --god --seconds=60 2>&1 | tee smoke.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if grep -q "SCRIPT ERROR" smoke.log; then echo "Script errors during smoke test"; exit 1; fi
+          [ "$code" -le 1 ]
 
       - name: Export for Web
         run: |
