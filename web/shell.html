@@ -7,110 +7,162 @@
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;700&display=swap" rel="stylesheet">
 		<style>
-/* Loading screen: dusk over Megakat City while the TurboKat spools up. */
+/* Launch screen: a key-art poster. Razor and T-Bone front and centre, the supporting
+   cast behind them, Megakat City burning orange below, the logo on top.
+   Character art lives in launch/ next to index.html (see web/launch/README.md);
+   any missing image simply drops out of the composition. */
 :root {
-	--night: #0b0d1a;
-	--dusk-top: #17163f;
-	--dusk-mid: #6b2f5c;
-	--dusk-low: #f2794f;
+	--night: #07080f;
+	--sky-top: #0d0c22;
+	--sky-mid: #3a1840;
+	--sky-low: #c2452a;
 	--yellow: #ffd23f;
 	--orange: #ff6a1f;
+	--red: #e3261b;
+	--blue: #3552e8;
 	--hud: #9dffb5;
-	--ink: #050508;
+	--ink: #040407;
 	--display: 'Bungee', Impact, 'Arial Black', sans-serif;
 	--ui: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
 }
 
 html, body, #canvas { margin: 0; padding: 0; border: 0; }
-body { color: white; background-color: var(--night); overflow: hidden; touch-action: none; }
+body { color: #fff; background: var(--night); overflow: hidden; touch-action: none; }
 #canvas { display: block; }
 #canvas:focus { outline: none; }
 
 #status {
 	position: absolute; inset: 0; overflow: hidden; visibility: hidden;
-	background: linear-gradient(to bottom, var(--dusk-top) 0%, var(--dusk-mid) 48%, var(--dusk-low) 78%, #3a1d2b 100%);
+	background: radial-gradient(120% 70% at 50% 100%, var(--sky-low) 0%, var(--sky-mid) 45%, var(--sky-top) 80%, var(--night) 100%);
 	font-family: var(--ui);
+	isolation: isolate;
 }
 #status-splash { display: none; }
 
-/* Searchlights sweeping the clouds. */
-.beam {
-	position: absolute; bottom: 18%; width: 9vw; height: 95vh; transform-origin: 50% 100%;
-	background: linear-gradient(to top, rgba(255, 240, 200, 0.28), rgba(255, 240, 200, 0));
-	clip-path: polygon(46% 100%, 54% 100%, 100% 0, 0 0);
-	animation: sweep 7s ease-in-out infinite alternate;
-}
-.beam.b1 { left: 18%; animation-duration: 6s; }
-.beam.b2 { left: 62%; animation-duration: 8s; animation-delay: -3s; }
-@keyframes sweep { from { transform: rotate(-28deg); } to { transform: rotate(24deg); } }
+/* Slow cinematic push-in on the whole poster. */
+.stage { position: absolute; inset: 0; animation: push 18s ease-out both; }
+@keyframes push { from { transform: scale(1.08); } to { transform: scale(1); } }
 
-/* Skyline silhouette with lit windows. */
-.skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 34vh; }
+/* Out-of-focus city lights and drifting haze. */
+.bokeh {
+	position: absolute; inset: 40% -10% 0; filter: blur(6px); opacity: 0.55;
+	background:
+		radial-gradient(6px 6px at 8% 70%, #ffd38a, transparent), radial-gradient(5px 5px at 17% 82%, #ffb36b, transparent),
+		radial-gradient(7px 7px at 26% 64%, #ffe1a8, transparent), radial-gradient(5px 5px at 38% 88%, #ffc27a, transparent),
+		radial-gradient(6px 6px at 52% 74%, #ffd38a, transparent), radial-gradient(8px 8px at 63% 86%, #ff9f5a, transparent),
+		radial-gradient(5px 5px at 74% 68%, #ffe1a8, transparent), radial-gradient(7px 7px at 86% 80%, #ffc27a, transparent),
+		radial-gradient(6px 6px at 94% 66%, #ffd38a, transparent);
+	animation: drift 30s linear infinite alternate;
+}
+.haze {
+	position: absolute; inset: 0;
+	background: radial-gradient(60% 30% at 30% 60%, rgba(255, 140, 90, 0.18), transparent 70%),
+		radial-gradient(50% 25% at 75% 55%, rgba(255, 90, 120, 0.14), transparent 70%);
+	animation: drift 24s ease-in-out infinite alternate-reverse;
+}
+@keyframes drift { from { transform: translateX(-2%); } to { transform: translateX(2%); } }
+
+/* Skyline silhouette along the bottom. */
+.skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 30vh; opacity: 0.95; }
 .skyline svg { width: 100%; height: 100%; display: block; }
 
-/* The TurboKat flying a banking pass across the sky. */
-.jet {
-	position: absolute; top: 30%; left: -30vw; width: min(34vw, 380px);
-	animation: pass 5.5s cubic-bezier(.45, .05, .4, 1) infinite;
-	filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+/* Characters. Each sits in a .who slot with a coloured rim glow behind it. */
+.cast { position: absolute; inset: 0; pointer-events: none; }
+.who { position: absolute; bottom: 0; display: flex; align-items: flex-end; justify-content: center; }
+.who img {
+	display: block; height: 100%; width: auto; max-width: none;
+	filter: drop-shadow(0 0 18px rgba(0, 0, 0, 0.6));
+	/* Stills with a background fade into the scene; cut-outs are unaffected. */
+	-webkit-mask-image: linear-gradient(to top, transparent 0%, #000 18%);
+	mask-image: linear-gradient(to top, transparent 0%, #000 18%);
 }
-.jet svg { width: 100%; height: auto; display: block; }
-.flame { transform-origin: 0 50%; animation: flicker 0.08s steps(2) infinite alternate; }
-@keyframes flicker { from { transform: scaleX(1); opacity: 0.95; } to { transform: scaleX(0.75); opacity: 0.75; } }
-@keyframes pass {
-	0%   { transform: translate(0, 12vh) rotate(-6deg) scale(0.7); }
-	45%  { transform: translate(70vw, -6vh) rotate(4deg) scale(1); }
-	100% { transform: translate(150vw, -22vh) rotate(-14deg) scale(0.6); }
+.who::before {
+	content: ""; position: absolute; inset: 15% 5% 0; z-index: -1; border-radius: 50%;
+	background: radial-gradient(closest-side, var(--glow, rgba(255, 120, 60, 0.55)), transparent);
+	filter: blur(20px);
 }
+.who.missing { display: none; }
 
-/* Logo slam. */
-.logo {
-	position: absolute; top: 9vh; left: 0; right: 0; text-align: center;
-	animation: slam 0.7s cubic-bezier(.2, 1.6, .4, 1) both;
+.hero { height: 74vh; animation: rise 1.1s cubic-bezier(.2, .8, .2, 1) both, breathe 6s ease-in-out 1.1s infinite; }
+.hero.razor { left: 4vw; --glow: rgba(255, 210, 63, 0.5); animation-delay: 0.25s, 1.35s; }
+.hero.tbone { right: 4vw; --glow: rgba(255, 106, 31, 0.55); animation-delay: 0.4s, 1.5s; }
+.side { height: 52vh; opacity: 0.85; filter: saturate(0.85) brightness(0.8); animation: rise 1.4s cubic-bezier(.2, .8, .2, 1) both; }
+.side.callie { left: 26vw; --glow: rgba(120, 170, 255, 0.45); animation-delay: 0.7s; }
+.side.feral { right: 26vw; --glow: rgba(90, 140, 255, 0.4); animation-delay: 0.8s; }
+.villain {
+	top: 6vh; bottom: auto; height: 40vh; left: 50%; transform: translateX(-50%);
+	opacity: 0.55; filter: brightness(0.55) saturate(0.7) hue-rotate(-10deg);
+	--glow: rgba(200, 40, 70, 0.55); animation: loom 2s ease-out 0.2s both;
 }
+.villain img { -webkit-mask-image: radial-gradient(closest-side, #000 60%, transparent); mask-image: radial-gradient(closest-side, #000 60%, transparent); }
+@keyframes rise { from { transform: translateY(14vh); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.8vh); } }
+@keyframes loom { from { opacity: 0; transform: translateX(-50%) scale(1.15); } to { opacity: 0.55; transform: translateX(-50%) scale(1); } }
+
+/* Logo with a metallic fill and a light sweep. */
+.logo { position: absolute; left: 0; right: 0; top: 42vh; text-align: center; z-index: 3; animation: slam 0.8s cubic-bezier(.2, 1.5, .4, 1) 0.9s both; }
 .logo h1 {
-	margin: 0; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em;
-	font-size: clamp(48px, 10vw, 128px); line-height: 0.9; color: var(--yellow);
+	position: relative; display: inline-block; margin: 0;
+	font-family: var(--display); font-weight: 400; font-size: clamp(52px, 9.5vw, 136px); line-height: 0.9;
 	transform: skew(-8deg);
-	text-shadow: 4px 4px 0 var(--orange), 8px 8px 0 var(--ink);
+	background: linear-gradient(180deg, #fff6c9 0%, var(--yellow) 42%, #f0a020 58%, #ffd23f 100%);
+	-webkit-background-clip: text; background-clip: text; color: transparent;
+	-webkit-text-stroke: 2px #5a2400;
+	filter: drop-shadow(5px 5px 0 var(--orange)) drop-shadow(5px 5px 0 var(--ink)) drop-shadow(0 0 30px rgba(255, 150, 40, 0.45));
 }
+.logo h1::after {
+	content: "SWAT KATS"; position: absolute; inset: 0; color: transparent;
+	background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.85) 50%, transparent 60%) no-repeat;
+	background-size: 250% 100%; -webkit-background-clip: text; background-clip: text;
+	animation: sheen 4s ease-in-out 2s infinite;
+}
+@keyframes sheen { from { background-position: 150% 0; } 40%, to { background-position: -60% 0; } }
 .logo p {
-	margin: 0.6em 0 0; font-weight: 700; letter-spacing: 0.4em; font-size: clamp(14px, 2.2vw, 24px);
-	text-shadow: 2px 2px 0 var(--ink);
+	margin: 0.5em 0 0; font-weight: 700; letter-spacing: 0.55em; font-size: clamp(13px, 1.9vw, 22px);
+	text-shadow: 0 2px 0 var(--ink), 0 0 16px rgba(0, 0, 0, 0.8);
 }
-@keyframes slam { from { transform: scale(2.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes slam { from { transform: scale(2.4); opacity: 0; } to { transform: none; opacity: 1; } }
 
-/* Radio chatter and the turbine spool gauge. */
-.panel {
-	position: absolute; left: 50%; bottom: 7vh; transform: translateX(-50%);
-	width: min(560px, calc(100vw - 32px)); box-sizing: border-box;
-	background: rgba(5, 8, 14, 0.78); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
-	padding: 14px 18px;
+/* Letterbox bars for a widescreen feel. */
+.bars::before, .bars::after { content: ""; position: absolute; left: 0; right: 0; height: 5vh; background: var(--ink); z-index: 4; }
+.bars::before { top: 0; }
+.bars::after { bottom: 0; }
+
+/* Status strip: radio quote and the spool gauge, sitting on the bottom letterbox. */
+.strip {
+	position: absolute; left: 50%; bottom: 7vh; transform: translateX(-50%); z-index: 5;
+	width: min(620px, calc(100vw - 32px)); box-sizing: border-box; text-align: center;
 }
-.radio { min-height: 3.2em; }
-.radio .who { color: var(--yellow); font-weight: 700; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
-.radio .line { font-size: 17px; margin-top: 2px; animation: type 0.4s ease-out; }
-@keyframes type { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-.gauge { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
-.fan { width: 34px; height: 34px; flex: none; animation: spin 0.6s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.bar { flex: 1; height: 12px; background: #1b1f2e; border: 2px solid var(--ink); position: relative; overflow: hidden; }
-.bar i { position: absolute; inset: 0 auto 0 0; width: 0%; background: linear-gradient(90deg, var(--orange), var(--yellow)); transition: width 0.25s; }
+.quote { min-height: 2.8em; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9); }
+.quote .who-name { color: var(--yellow); font-weight: 700; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; }
+.quote .line { font-size: 17px; margin-top: 3px; animation: fadein 0.5s ease-out; }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.gauge { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.bar { flex: 1; height: 4px; background: rgba(255, 255, 255, 0.14); position: relative; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 0%; background: linear-gradient(90deg, var(--orange), var(--yellow)); box-shadow: 0 0 12px var(--orange); transition: width 0.25s; }
 .bar.indeterminate i { width: 30%; animation: scan 1.1s ease-in-out infinite alternate; }
 @keyframes scan { from { left: 0; } to { left: 70%; } }
-.pct { color: var(--hud); font-weight: 700; font-size: 14px; min-width: 9.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.pct { color: var(--hud); font-weight: 700; font-size: 12px; letter-spacing: 0.12em; min-width: 11em; text-align: right; font-variant-numeric: tabular-nums; }
 
 #status-notice {
-	display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+	display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6;
 	background: #5b3943; border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
-	color: #f2e6e6; line-height: 1.4; padding: 1rem 1.4rem; text-align: center; z-index: 2;
+	color: #f2e6e6; line-height: 1.4; padding: 1rem 1.4rem; text-align: center;
 	width: min(520px, calc(100vw - 32px)); box-sizing: border-box;
 }
-.fine { position: absolute; bottom: 1.4vh; left: 0; right: 0; text-align: center; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+.fine { position: absolute; bottom: 1.4vh; left: 0; right: 0; text-align: center; font-size: 10px; color: rgba(255, 255, 255, 0.45); z-index: 5; letter-spacing: 0.05em; }
+
+/* Phones: heroes shrink to the sides of the logo, supporting cast hides. */
+@media (max-width: 720px) {
+	.hero { height: 46vh; }
+	.hero.razor { left: -14vw; }
+	.hero.tbone { right: -14vw; }
+	.side { display: none; }
+	.logo { top: 30vh; }
+}
 
 @media (prefers-reduced-motion: reduce) {
-	.beam, .jet, .flame, .fan, .logo, .bar.indeterminate i { animation: none; }
-	.jet { left: 50%; transform: translateX(-50%); }
+	.stage, .bokeh, .haze, .hero, .side, .villain, .logo, .logo h1::after, .bar.indeterminate i { animation: none !important; }
 }
 		</style>
 		$GODOT_HEAD_INCLUDE
@@ -121,79 +173,46 @@ body { color: white; background-color: var(--night); overflow: hidden; touch-act
 
 		<div id="status">
 			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
-			<div class="beam b1"></div>
-			<div class="beam b2"></div>
-
-			<div class="jet" aria-hidden="true">
-				<!-- TurboKat, top view, nose to the right. -->
-				<svg viewBox="0 0 400 220">
-					<g class="flame">
-						<polygon points="58,84 0,92 58,100" fill="#ffb347"/>
-						<polygon points="58,120 0,128 58,136" fill="#ffb347"/>
-						<polygon points="58,88 22,92 58,96" fill="#dff1ff"/>
-						<polygon points="58,124 22,128 58,132" fill="#dff1ff"/>
-					</g>
-					<!-- wings -->
-					<polygon points="150,104 92,6 70,4 82,40 60,52 88,104" fill="#0e0e14" stroke="#000" stroke-width="3"/>
-					<polygon points="150,116 92,214 70,216 82,180 60,168 88,116" fill="#0e0e14" stroke="#000" stroke-width="3"/>
-					<polygon points="88,20 72,6 92,6 98,22" fill="#2f45d6"/>
-					<polygon points="88,200 72,214 92,214 98,198" fill="#2f45d6"/>
-					<polygon points="120,72 104,48 112,46 128,70" fill="#d81e14"/>
-					<polygon points="120,148 104,172 112,174 128,150" fill="#d81e14"/>
-					<!-- engines -->
-					<rect x="56" y="80" width="40" height="24" rx="6" fill="#d81e14" stroke="#000" stroke-width="3"/>
-					<rect x="56" y="116" width="40" height="24" rx="6" fill="#d81e14" stroke="#000" stroke-width="3"/>
-					<!-- fuselage -->
-					<polygon points="70,110 96,82 210,84 330,104 392,110 330,116 210,136 96,138" fill="#111118" stroke="#000" stroke-width="3"/>
-					<!-- tail fins (seen from above) -->
-					<polygon points="78,92 112,90 128,96 84,98" fill="#1d1d26" stroke="#000" stroke-width="2"/>
-					<polygon points="78,128 112,130 128,124 84,122" fill="#1d1d26" stroke="#000" stroke-width="2"/>
-					<!-- cockpit pod and glass -->
-					<polygon points="200,110 226,94 306,100 340,110 306,120 226,126" fill="#d81e14" stroke="#000" stroke-width="3"/>
-					<polygon points="232,104 266,98 300,104 300,116 266,122 232,116" fill="#3552e8"/>
-					<line x1="266" y1="98" x2="266" y2="122" stroke="#d81e14" stroke-width="4"/>
-					<line x1="240" y1="110" x2="300" y2="110" stroke="#d81e14" stroke-width="2"/>
-					<polygon points="380,108 398,110 380,112" fill="#2f45d6"/>
-				</svg>
+			<div class="stage">
+				<div class="haze"></div>
+				<div class="bokeh"></div>
+				<div class="cast">
+					<div class="who villain"><img src="launch/dark_kat.png" alt="Dark Kat"></div>
+					<div class="who side callie"><img src="launch/callie.png" alt="Callie Briggs"></div>
+					<div class="who side feral"><img src="launch/feral.png" alt="Commander Feral"></div>
+				</div>
+				<div class="skyline" aria-hidden="true">
+					<svg viewBox="0 0 1600 300" preserveAspectRatio="none">
+						<defs>
+							<pattern id="win" width="12" height="16" patternUnits="userSpaceOnUse">
+								<rect width="12" height="16" fill="#0f0a16"/>
+								<rect x="3" y="4" width="5" height="7" fill="#ffc96b" opacity="0.55"/>
+							</pattern>
+						</defs>
+						<path fill="url(#win)" d="M0 300V170h60v-60h40v-40h30v40h50V150h70V50h20V20h12v30h20v100h60V110h80v-50h40v50h50V140h90V30h16V0h8v30h16v110h70V120h60v-80h70v80h40V160h80V100h50V60h30v40h40v60h80V130h60v30h50V90h70v70h60V140h80v160Z"/>
+					</svg>
+				</div>
+				<div class="cast">
+					<div class="who hero razor"><img src="launch/razor.png" alt="Razor"></div>
+					<div class="who hero tbone"><img src="launch/tbone.png" alt="T-Bone"></div>
+				</div>
+				<div class="logo">
+					<h1>SWAT KATS</h1>
+					<p>MEGAKAT SKIES</p>
+				</div>
 			</div>
-
-			<div class="skyline" aria-hidden="true">
-				<svg viewBox="0 0 1600 340" preserveAspectRatio="none">
-					<defs>
-						<pattern id="win" width="14" height="18" patternUnits="userSpaceOnUse">
-							<rect width="14" height="18" fill="#1a1426"/>
-							<rect x="4" y="5" width="6" height="8" fill="#ffcf73" opacity="0.75"/>
-						</pattern>
-					</defs>
-					<path fill="url(#win)" d="M0 340V190h60v-60h40v-40h30v40h50V170h70V60h20V30h12v30h20v110h60V120h80v-50h40v50h50V160h90V40h16V0h8v40h16v120h70V130h60v-80h70v80h40V180h80V110h50V70h30v40h40v70h80V140h60v40h50V100h70v80h60V150h80v190Z"/>
-					<path fill="#120d1c" d="M0 340V260h120v-30h90v30h160v-40h120v40h200v-20h140v20h210v-30h120v30h160v-40h120v40h160v80Z"/>
-				</svg>
-			</div>
-
-			<div class="logo">
-				<h1>SWAT KATS</h1>
-				<p>MEGAKAT SKIES</p>
-			</div>
-
-			<div class="panel">
-				<div class="radio" aria-live="polite">
-					<div class="who" id="radio-who">T-Bone</div>
+			<div class="bars" aria-hidden="true"></div>
+			<div class="strip">
+				<div class="quote" aria-live="polite">
+					<div class="who-name" id="radio-who">T-Bone</div>
 					<div class="line" id="radio-line">Hatch is open. Spinning up the turbines.</div>
 				</div>
 				<div class="gauge">
-					<svg class="fan" viewBox="0 0 40 40" aria-hidden="true">
-						<circle cx="20" cy="20" r="18" fill="#d81e14" stroke="#000" stroke-width="2"/>
-						<circle cx="20" cy="20" r="13" fill="#e8e8ee"/>
-						<g fill="#3a3c44">
-							<path d="M20 20 L18 8 L23 8Z"/><path d="M20 20 L31 17 L31 22Z"/><path d="M20 20 L22 32 L17 32Z"/><path d="M20 20 L9 23 L9 18Z"/>
-						</g>
-						<circle cx="20" cy="20" r="3" fill="#111"/>
-					</svg>
 					<div class="bar indeterminate" id="bar"><i></i></div>
 					<div class="pct" id="pct">SPOOLING UP</div>
 				</div>
 			</div>
-			<div class="fine">Unofficial non-commercial fan game · SWAT Kats © its owners</div>
+			<div class="fine">Unofficial non-commercial fan game · SWAT Kats and its characters © their owners</div>
 			<div id="status-notice"></div>
 		</div>
 
@@ -203,6 +222,15 @@ const GODOT_CONFIG = $GODOT_CONFIG;
 const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
 const engine = new Engine(GODOT_CONFIG);
 
+// Character art that fails to load drops out of the composition.
+document.querySelectorAll('.who img').forEach((img) => {
+	const hide = () => img.parentElement.classList.add('missing');
+	if (img.complete && img.naturalWidth === 0) {
+		hide();
+	}
+	img.addEventListener('error', hide);
+});
+
 // Radio chatter shown while the game downloads.
 const RADIO = [
 	['T-Bone', 'Hatch is open. Spinning up the turbines.'],
@@ -211,6 +239,7 @@ const RADIO = [
 	['T-Bone', 'Hang on to your tail, buddy!'],
 	['Commander Feral', 'Those vigilantes had better stay out of my airspace.'],
 	['Razor', 'Radar is hot. Creeplings inbound from the bay.'],
+	['Dark Kat', 'Tonight, Megakat City falls.'],
 ];
 
 (function () {
@@ -232,7 +261,7 @@ const RADIO = [
 		line.style.animation = 'none';
 		void line.offsetWidth; // restart the fade-in
 		line.style.animation = '';
-	}, 2600);
+	}, 2800);
 
 	function setStatusMode(mode) {
 		if (statusMode === mode || !initializing) {
@@ -287,7 +316,7 @@ const RADIO = [
 					const p = Math.min(100, Math.round((current / total) * 100));
 					bar.classList.remove('indeterminate');
 					fill.style.width = p + '%';
-					pct.textContent = 'TURBINES ' + p + '%';
+					pct.textContent = 'SPOOLING TURBINES ' + p + '%';
 				} else {
 					bar.classList.add('indeterminate');
 					pct.textContent = 'SPOOLING UP';
