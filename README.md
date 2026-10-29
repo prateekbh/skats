@@ -48,6 +48,8 @@ See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan 
 
 ## Credits
 
+- Music: "Big Trouble" from the SWAT Kats score, © its owners, used in this non-commercial fan
+  project. Trimmed to start at 0:04 (`web/launch/big_trouble.mp3`).
 - Character art and logo on the launch screen: SWAT Kats artwork © Hanna-Barbera / Warner Bros.
   Discovery, used in this non-commercial fan project. The T-Bone and Razor poster is fan art signed
   "Feno 2011". Processed by `tools/prepare_launch_art.py` (cut-outs, traced vector logo).

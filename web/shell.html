@@ -148,6 +148,21 @@ body { color: #fff; background: var(--night); overflow: hidden; touch-action: no
 @keyframes scan { from { left: 0; } to { left: 70%; } }
 .pct { color: var(--hud); font-weight: 700; font-size: 11px; letter-spacing: 0.12em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+/* Sound toggle (top right, under the letterbox bar). */
+.sound {
+	position: absolute; top: calc(4.5vh + 12px); right: max(16px, 2vw); z-index: 6;
+	display: flex; align-items: center; gap: 8px; cursor: pointer;
+	font: 700 11px var(--ui); letter-spacing: 0.16em; color: #fff;
+	background: rgba(6, 8, 14, 0.7); border: 1px solid rgba(157, 255, 181, 0.4); padding: 8px 12px;
+}
+.sound:hover, .sound:focus-visible { border-color: var(--hud); outline: none; }
+.sound .eq { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+.sound .eq i { width: 3px; background: var(--hud); height: 30%; }
+.sound.on .eq i { animation: eq 0.9s ease-in-out infinite alternate; }
+.sound.on .eq i:nth-child(2) { animation-delay: -0.3s; }
+.sound.on .eq i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes eq { from { height: 25%; } to { height: 100%; } }
+
 #status-notice {
 	display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6;
 	background: #5b3943; border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
@@ -212,13 +227,97 @@ body { color: #fff; background: var(--night); overflow: hidden; touch-action: no
 			</div>
 			<div class="fine">Unofficial non-commercial fan game · SWAT Kats and its characters © their owners · T-Bone &amp; Razor art by Feno (fan art)</div>
 			<div id="status-notice"></div>
+			<button class="sound" id="sound-toggle" type="button" aria-pressed="false"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span><span id="sound-label">SOUND ON</span></button>
 		</div>
+		<!-- Theme music lives outside the loading overlay so it keeps playing into the game. -->
+		<audio id="sk-music" src="launch/big_trouble.mp3" loop preload="auto"></audio>
 
 		<script src="$GODOT_URL"></script>
 		<script>
 const GODOT_CONFIG = $GODOT_CONFIG;
 const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
 const engine = new Engine(GODOT_CONFIG);
+
+// Theme music. Starts on the loading screen and keeps playing into the game, which
+// drives it through window.skMusic (see scripts/autoload/music.gd).
+window.skMusic = (function () {
+	const audio = document.getElementById('sk-music');
+	const button = document.getElementById('sound-toggle');
+	const label = document.getElementById('sound-label');
+	let target = 0.7;
+	let muted = false;
+	let fadeTimer = null;
+	audio.volume = 0;
+
+	function render() {
+		const playing = !audio.paused && !muted;
+		if (button) {
+			button.classList.toggle('on', playing);
+			button.setAttribute('aria-pressed', String(playing));
+			label.textContent = playing ? 'SOUND OFF' : 'SOUND ON';
+		}
+	}
+	function fadeTo(volume, seconds) {
+		target = volume;
+		clearInterval(fadeTimer);
+		if (volume > 0 && audio.paused && !muted) {
+			audio.volume = 0; // always fade in from silence
+			audio.play().then(render, () => {
+				// Autoplay blocked: stay silent until the first click or key (see unlock()).
+				clearInterval(fadeTimer);
+				audio.volume = 0;
+				render();
+			});
+		}
+		const start = audio.volume;
+		const goal = muted ? 0 : volume;
+		const steps = Math.max(1, Math.round((seconds || 0) * 30));
+		let i = 0;
+		fadeTimer = setInterval(() => {
+			i++;
+			audio.volume = Math.min(1, Math.max(0, start + (goal - start) * (i / steps)));
+			if (i >= steps) {
+				clearInterval(fadeTimer);
+				if (goal === 0 && volume === 0) {
+					audio.pause();
+				}
+				render();
+			}
+		}, 1000 / 30);
+	}
+	function setMuted(value) {
+		muted = value;
+		fadeTo(target, 0.3);
+		render();
+	}
+	// Browsers block sound until the player interacts; any first click, tap or key starts it.
+	const UNLOCK_EVENTS = ['pointerdown', 'keydown', 'touchstart'];
+	function unlock(ev) {
+		if (ev.target && ev.target.closest && ev.target.closest('#sound-toggle')) {
+			return; // the button handles its own click
+		}
+		UNLOCK_EVENTS.forEach((e) => document.removeEventListener(e, unlock, true));
+		if (!muted && target > 0 && audio.paused) {
+			fadeTo(target, 2.5);
+		}
+	}
+	UNLOCK_EVENTS.forEach((e) => document.addEventListener(e, unlock, true));
+	if (button) {
+		button.addEventListener('click', (ev) => {
+			ev.stopPropagation();
+			if (audio.paused || muted) {
+				muted = false;
+				fadeTo(target || 0.7, 1.5);
+			} else {
+				setMuted(true);
+			}
+		});
+	}
+	audio.addEventListener('play', render);
+	audio.addEventListener('pause', render);
+	fadeTo(target, 2.5); // try to autoplay with a fade-in
+	return { fadeTo, setMuted };
+}());
 
 // Art that fails to load drops out of the composition.
 document.querySelectorAll('#status img').forEach((img) => {
@@ -275,6 +374,7 @@ RADIO.forEach((r) => { new Image().src = 'launch/face_' + r[1] + '.png'; });
 		}
 		if (mode === 'hidden') {
 			clearInterval(radioTimer);
+			// The sound button leaves with the overlay; the game's M key mutes from here on.
 			statusOverlay.remove();
 			initializing = false;
 			return;

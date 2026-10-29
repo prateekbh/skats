@@ -178,6 +178,8 @@ func _show_title() -> void:
 	player.player_control = false
 	camera.shot = "orbit"
 	menu.show_title()
+	if not _autotest:
+		Music.play_theme()
 
 
 func start_episode(ep: Dictionary) -> void:
@@ -204,6 +206,7 @@ func start_episode(ep: Dictionary) -> void:
 	hud.message("%s: %s" % [ep.number.to_upper(), ep.title.to_upper()], 3.2)
 	state = State.PLAYING
 	mission.start()
+	Music.fade_out(2.5)
 
 
 func end_mission(win: bool, reason: String) -> void:
@@ -259,6 +262,7 @@ func _show_debrief() -> void:
 		get_tree().quit(0 if _end_win else 2)
 		return
 	menu.show_debrief(data)
+	Music.play_theme(3.0)
 	if player.alive:
 		player.player_control = false
 		camera.shot = "orbit"
@@ -385,6 +389,7 @@ func _start_intro() -> void:
 	city.set_hatch(0.0)
 	camera.shot = "script"
 	menu.show_intro()
+	Music.play_theme()
 
 
 ## Launch timing: the hatch snaps open, then the TurboKat bursts out of the underground

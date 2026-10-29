@@ -85,6 +85,7 @@ func record_score(id: String, score: int) -> bool:
 func set_muted(value: bool) -> void:
 	muted = value
 	AudioServer.set_bus_mute(0, muted)
+	Music.set_muted(muted)
 	_save()
 
 
@@ -109,6 +110,7 @@ func _load() -> void:
 	invert_pitch = cfg.get_value("settings", "invert_pitch", false)
 	muted = cfg.get_value("settings", "muted", false)
 	AudioServer.set_bus_mute(0, muted)
+	Music.set_muted.call_deferred(muted)
 	if cfg.has_section("best"):
 		for id in cfg.get_section_keys("best"):
 			best_scores[id] = cfg.get_value("best", id, 0)
