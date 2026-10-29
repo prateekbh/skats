@@ -20,12 +20,24 @@ const STEEL := Color(0.35, 0.36, 0.4)
 
 const INK := 0.045 # outline thickness
 
+## Optional imported model. Drop a glTF export at this path (see assets/turbokat/README.md)
+## and it replaces the procedural airframe; engines, flames and lights are still added here.
+const CUSTOM_MODEL := "res://assets/turbokat/turbokat.glb"
+## Imported models are scaled to this nose-to-tail length (metres) to match the flight model.
+const CUSTOM_LENGTH := 22.0
+## Rotation applied to the imported model so its nose points to -Z. glTF faces +Z, hence 180°.
+const CUSTOM_ROTATION_DEG := Vector3(0, 180, 0)
+## Where the afterburners sit on the imported model (local metres, after scaling).
+const CUSTOM_NOZZLES: Array[Vector3] = [Vector3(-2.6, -0.6, 9.0), Vector3(2.6, -0.6, 9.0)]
+
 
 ## Returns {"root", "burners": Array[Node3D], "wingtips": Array[Vector3], "missiles": Array[Node3D], "fans": Array[Node3D]}.
 static func build(parent: Node3D) -> Dictionary:
 	var root := Node3D.new()
 	root.name = "TurboKat"
 	parent.add_child(root)
+	if ResourceLoader.exists(CUSTOM_MODEL):
+		return _build_custom(root)
 
 	var black := _paint(BLACK, 0.55, 0.35, 0.55)
 	var facet := _paint(FACET, 0.5, 0.4, 0.45)
@@ -264,3 +276,55 @@ static func _build_hardpoints(root: Node3D, steel: Material, white: Material, re
 			MeshKit.part(m, MeshKit.box(Vector3(0.05, 0.75, 0.35)), red, Vector3(0, 0, 1.2))
 			missiles.append(m)
 	return missiles
+
+
+## Uses an imported glTF airframe, auto-scaled to CUSTOM_LENGTH, plus procedural afterburners.
+static func _build_custom(root: Node3D) -> Dictionary:
+	var scene := load(CUSTOM_MODEL) as PackedScene
+	var model := scene.instantiate() as Node3D
+	var holder := Node3D.new()
+	holder.rotation_degrees = CUSTOM_ROTATION_DEG
+	root.add_child(holder)
+	holder.add_child(model)
+	var box := _visual_aabb(model, Transform3D())
+	var longest := maxf(box.size.x, maxf(box.size.y, box.size.z))
+	if longest > 0.0:
+		var s := CUSTOM_LENGTH / longest
+		model.scale = Vector3.ONE * s
+		model.position = -box.get_center() * s
+	var burners: Array[Node3D] = []
+	var flame := MeshKit.glow(Color(1.0, 0.5, 0.18, 0.85), true)
+	var core := MeshKit.glow(Color(0.65, 0.85, 1.0, 0.9), true)
+	for p in CUSTOM_NOZZLES:
+		var pivot := Node3D.new()
+		pivot.position = p
+		root.add_child(pivot)
+		MeshKit.part(pivot, MeshKit.cyl(0.0, 0.85, 5.5, 12), flame, Vector3(0, 0, 2.75), Vector3(PI / 2, 0, 0))
+		MeshKit.part(pivot, MeshKit.cyl(0.0, 0.38, 2.6, 10), core, Vector3(0, 0, 1.3), Vector3(PI / 2, 0, 0))
+		burners.append(pivot)
+	var half := CUSTOM_LENGTH * 0.42
+	return {
+		"root": root,
+		"burners": burners,
+		"fans": [],
+		"missiles": [],
+		"wingtips": [Vector3(-half, 0, CUSTOM_LENGTH * 0.4), Vector3(half, 0, CUSTOM_LENGTH * 0.4)],
+	}
+
+
+static func _visual_aabb(node: Node, xf: Transform3D) -> AABB:
+	var out := AABB()
+	var first := true
+	var t := xf
+	if node is Node3D:
+		t = xf * (node as Node3D).transform
+	if node is VisualInstance3D:
+		out = t * (node as VisualInstance3D).get_aabb()
+		first = false
+	for c in node.get_children():
+		var sub := _visual_aabb(c, t)
+		if sub.size == Vector3.ZERO:
+			continue
+		out = sub if first else out.merge(sub)
+		first = false
+	return out

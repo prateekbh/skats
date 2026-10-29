@@ -2,3 +2,7 @@
 build/
 *.tmp
 export_credentials.cfg
+# Imported TurboKat model: remove these lines once its license is confirmed redistributable.
+assets/turbokat/*.glb
+assets/turbokat/*.gltf
+assets/turbokat/*.bin
