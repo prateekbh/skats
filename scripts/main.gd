@@ -387,49 +387,63 @@ func _start_intro() -> void:
 	menu.show_intro()
 
 
+## Launch timing: the hatch snaps open, then the TurboKat bursts out of the underground
+## runway already nose-up at speed and keeps climbing, as in the show. No hover.
+const INTRO_EMERGE := 1.9 # seconds until the nose clears the hatch
+const INTRO_CLIMB_DEG := 32.0 # launch angle out of the tunnel
+const INTRO_EXIT_SPEED := 120.0 # m/s at the hatch
+const INTRO_ACCEL := 45.0 # m/s² after emerging
+
+
 func _intro_step(delta: float) -> void:
 	_intro_seq += delta
 	var t := _intro_seq
 	var yard := city.salvage_yard_pos
-	var fwd := player.forward()
-	_intro_once("alarm", 0.4, func(): Sfx.play("alarm", -10.0))
-	city.set_hatch(smoothstep(0.8, 2.2, t))
-	if t < 4.4:
-		# Rise out of the shaft, then hover with a little bob and the nose lifting.
-		var rise := smoothstep(1.9, 3.9, t)
-		var bob := sin(t * 3.0) * 0.4 * smoothstep(3.6, 4.0, t)
-		var base := yard + Vector3(0, lerpf(-14.0, 24.0, rise) + bob, 0)
-		player.global_position = base
-		var flat := Vector3(-yard.x, 0, -yard.z).normalized()
-		var nose_up := deg_to_rad(14.0) * smoothstep(3.7, 4.4, t)
-		player.look_at(base + flat + Vector3.UP * tan(nose_up), Vector3.UP)
-		player.throttle = lerpf(0.15, 0.6, smoothstep(2.0, 4.4, t))
-		player.speed = 0.0
-		_intro_once("dust", 2.1, func(): combat._burst(yard + Vector3(0, 2, 0), combat._smoke_mat, 30, 2.5, Vector2(10, 30), Vector2(10, 18), 2.5, [Color(0.5, 0.42, 0.35, 0.0), Color(0.45, 0.38, 0.32, 0.6), Color(0.4, 0.35, 0.3, 0.0)], Vector3(0, 4, 0), 1.0))
-		# Low corner of the yard, slowly dollying in on the hatch.
-		var cam_from := yard + Vector3(70, 10, 55)
-		var cam_to := yard + Vector3(48, 16, 38)
-		camera.global_position = cam_from.lerp(cam_to, smoothstep(0.0, 4.4, t))
-		camera.look_at(yard + Vector3(0, lerpf(2.0, 20.0, smoothstep(1.5, 4.0, t)), 0), Vector3.UP)
+	var hatch := yard + Vector3(0, 1.5, 0)
+	var flat := Vector3(-yard.x, 0, -yard.z).normalized() # toward downtown
+	_intro_once("alarm", 0.3, func(): Sfx.play("alarm", -10.0))
+	city.set_hatch(smoothstep(0.5, 1.4, t))
+
+	# Distance travelled along the launch path, measured from the hatch (negative = still in the tunnel).
+	var dt_e := t - INTRO_EMERGE
+	var dist := INTRO_EXIT_SPEED * dt_e + (0.5 * INTRO_ACCEL * dt_e * dt_e if dt_e > 0.0 else 0.0)
+	# Climb angle eases from the tunnel's 32° to a 14° cruise climb once clear of the yard.
+	var climb := deg_to_rad(lerpf(INTRO_CLIMB_DEG, 14.0, smoothstep(INTRO_EMERGE + 1.2, INTRO_EMERGE + 4.0, t)))
+	var dir := (flat * cos(climb) + Vector3.UP * sin(climb)).normalized()
+	if dist <= 0.0:
+		var tunnel := (flat * cos(deg_to_rad(INTRO_CLIMB_DEG)) + Vector3.UP * sin(deg_to_rad(INTRO_CLIMB_DEG))).normalized()
+		player.global_position = hatch + tunnel * dist
+		player.look_at(player.global_position + tunnel, Vector3.UP)
 	else:
-		# Afterburners: accelerate away in a climb, camera swinging in behind.
-		_intro_once("launch", 4.4, func():
-			Sfx.play("missile", 2.0, 0.6)
-			Sfx.play("boom", -2.0, 0.7)
-			camera.add_shake(1.6))
-		_intro_once("logo", 5.0, menu.slam_logo)
-		player.boosting = true
-		player.throttle = 1.0
-		player.speed = minf(player.speed + 160.0 * delta, 300.0)
-		player.global_position += fwd * player.speed * delta
-		var k := smoothstep(4.4, 6.0, t)
-		var behind := player.global_position - fwd * 26.0 + Vector3.UP * 7.0
-		var side := yard + Vector3(48, 16, 38)
-		camera.global_position = side.lerp(behind, k)
-		camera.look_at(player.global_position + fwd * 20.0 * k, Vector3.UP)
+		# Integrate along the (gently flattening) climb so the path stays continuous.
+		player.global_position += dir * (INTRO_EXIT_SPEED + INTRO_ACCEL * dt_e) * delta
+		player.look_at(player.global_position + dir, Vector3.UP)
+	player.visible = dist > -30.0
+	player.speed = maxf(INTRO_EXIT_SPEED + INTRO_ACCEL * maxf(dt_e, 0.0), 0.0)
+	player.throttle = 1.0
+	player.boosting = true
+
+	_intro_once("launch", INTRO_EMERGE - 0.05, func():
+		Sfx.play("missile", 4.0, 0.55)
+		Sfx.play("boom", 0.0, 0.6)
+		camera.add_shake(1.8)
+		combat._burst(hatch, combat._smoke_mat, 40, 2.8, Vector2(14, 40), Vector2(10, 20), 2.6,
+			[Color(0.5, 0.42, 0.35, 0.0), Color(0.45, 0.38, 0.32, 0.65), Color(0.4, 0.35, 0.3, 0.0)], Vector3(0, 5, 0), 1.2))
+	_intro_once("logo", INTRO_EMERGE + 2.4, menu.slam_logo)
+
+	# Camera: low on the yard floor watching the hatch, then swinging in behind the climb.
+	# The crane stands on the other side of the yard, so the camera sits on this side, above the junk.
+	var side := Vector3.UP.cross(flat).normalized()
+	var low := hatch - side * 46.0 + flat * 22.0 + Vector3(0, 11, 0)
+	var k := smoothstep(INTRO_EMERGE + 0.45, INTRO_EMERGE + 1.8, t)
+	var chase := player.global_position - dir * 30.0 + Vector3.UP * 8.0
+	camera.global_position = low.lerp(chase, k)
+	var target := hatch + Vector3(0, 4, 0) if dist < -10.0 else player.global_position + dir * 25.0 * k
+	camera.look_at(target, Vector3.UP)
+
 	player._effects(delta)
-	Sfx.set_engine(true, player.throttle, 1.0 if player.boosting else 0.0)
-	if t > 8.0:
+	Sfx.set_engine(true, player.throttle, 1.0)
+	if t > INTRO_EMERGE + 6.0:
 		_finish_intro()
 
 
