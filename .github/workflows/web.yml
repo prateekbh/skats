@@ -47,7 +47,7 @@ jobs:
           godot --headless --path . --export-release "Web" build/web/index.html
           # Launch-screen character art is served next to index.html.
           mkdir -p build/web/launch
-          cp web/launch/*.png build/web/launch/ 2>/dev/null || true
+          cp web/launch/*.png web/launch/*.svg build/web/launch/
 
       - uses: actions/upload-pages-artifact@v3
         with:

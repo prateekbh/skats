@@ -48,6 +48,10 @@ See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan 
 
 ## Credits
 
+- Character art and logo on the launch screen: SWAT Kats artwork © Hanna-Barbera / Warner Bros.
+  Discovery, used in this non-commercial fan project. The T-Bone and Razor poster is fan art signed
+  "Feno 2011". Processed by `tools/prepare_launch_art.py` (cut-outs, traced vector logo).
+
 - TurboKat 3D model: "TurboKat from Swat Kats Fixed STL" by RabbitXGT
   (https://www.thingiverse.com/thing:4500382), based on Captain_Ahab_62's model, CC BY.
   Converted and painted for the game, see [`assets/turbokat/`](assets/turbokat/README.md).

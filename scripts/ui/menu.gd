@@ -111,16 +111,28 @@ func slam_logo() -> void:
 	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_screen.add_child(flash)
-	var title := _label(_screen, "SWAT KATS", 120, YELLOW)
-	title.add_theme_color_override("font_outline_color", ORANGE)
-	title.add_theme_constant_override("outline_size", 22)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	title.offset_left = -560
-	title.offset_right = 560
-	title.offset_top = -180
-	title.offset_bottom = -20
-	title.pivot_offset = Vector2(560, 80)
+	var title: Control = _logo_art(720.0)
+	if title:
+		_screen.add_child(title)
+		var sz := title.custom_minimum_size
+		title.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		title.offset_left = -sz.x * 0.5
+		title.offset_right = sz.x * 0.5
+		title.offset_top = -sz.y * 0.5 - 70
+		title.offset_bottom = sz.y * 0.5 - 70
+		title.pivot_offset = sz * 0.5
+	else:
+		var label := _label(_screen, "SWAT KATS", 120, YELLOW)
+		label.add_theme_color_override("font_outline_color", ORANGE)
+		label.add_theme_constant_override("outline_size", 22)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		label.offset_left = -560
+		label.offset_right = 560
+		label.offset_top = -180
+		label.offset_bottom = -20
+		label.pivot_offset = Vector2(560, 80)
+		title = label
 	var sub := _label(_screen, "MEGAKAT  SKIES", 32, TEXT)
 	sub.add_theme_color_override("font_outline_color", INK)
 	sub.add_theme_constant_override("outline_size", 8)
@@ -128,8 +140,8 @@ func slam_logo() -> void:
 	sub.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	sub.offset_left = -400
 	sub.offset_right = 400
-	sub.offset_top = -10
-	sub.offset_bottom = 40
+	sub.offset_top = 150
+	sub.offset_bottom = 200
 	sub.modulate.a = 0.0
 	title.scale = Vector2.ONE * 2.6
 	title.modulate.a = 0.0
@@ -201,7 +213,32 @@ func _button(parent: Node, text: String, cb: Callable, enabled := true) -> Butto
 	return b
 
 
+const LOGO_PATH := "res://assets/ui/logo.svg"
+
+
+## The show's logo (traced vector, see tools/prepare_launch_art.py) at the given width.
+func _logo_art(width: float) -> TextureRect:
+	if not ResourceLoader.exists(LOGO_PATH):
+		return null
+	var tex := load(LOGO_PATH) as Texture2D
+	var r := TextureRect.new()
+	r.texture = tex
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	r.custom_minimum_size = Vector2(width, width * tex.get_height() / tex.get_width())
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
 func _logo(parent: Node) -> void:
+	var art := _logo_art(440.0)
+	if art:
+		parent.add_child(art)
+		var s0 := _label(parent, "MEGAKAT  SKIES", 22, TEXT)
+		s0.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		s0.add_theme_color_override("font_outline_color", INK)
+		s0.add_theme_constant_override("outline_size", 6)
+		return
 	var t := _label(parent, "SWAT KATS", 76, YELLOW)
 	t.add_theme_color_override("font_outline_color", ORANGE)
 	t.add_theme_constant_override("outline_size", 14)
