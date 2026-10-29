@@ -39,6 +39,9 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 - **Launch sequence:** a themed browser loading screen (searchlights, TurboKat flyby, radio chatter, turbine spool-up gauge), then an in-game intro where the salvage-yard hatch opens, the TurboKat rises out and blasts off as the logo slams in.
 - **Arcade flight model:** bank-to-turn, auto-level, afterburner, speed gained in dives and lost in climbs.
 - **Weapons:** twin cannons with overheat, lock-on homing missiles, and the Mega-Missile.
+- **Cartoon effects:** banded toon fireballs that break up into chunky smoke, impact stars,
+  shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on
+  big kills. All pooled (no per-explosion allocations) to keep the web build smooth.
 - **Megakat City:** procedural downtown with lit windows, street lamps, Enforcer HQ, City Hall, the bay, and the salvage yard where the hidden hangar is.
 - **Episode 1, *Dark Skies Over Megakat*:** two Creepling waves, then Dark Kat's warship (destroy the turrets, then the hull). Original radio dialogue for Razor, T-Bone, Callie, Feral and Dark Kat.
 - **Free Flight:** endless escalating waves for score attack.

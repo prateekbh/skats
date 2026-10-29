@@ -48,13 +48,43 @@ def split_along(mesh: trimesh.Trimesh, normal, origin) -> trimesh.Trimesh:
 
 
 def prepare(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
-    """Pre-cuts the mesh at the paint boundaries used by classify()."""
+    """Pre-cuts the mesh at the paint boundaries used by classify(), then welds the cut
+    seams back together (merge by distance) and makes the normals consistent, so the
+    cuts never show up as shading seams."""
     span = np.abs(mesh.vertices[:, 1]).max()
     for side in (-1.0, 1.0):
         mesh = split_along(mesh, [0, side, 0], [0, side * span * 0.8, 0])
     for t in (0.045, 0.12, 0.6, 0.72):
         mesh = split_along(mesh, [1, 0, 0], [NOSE_X + t * (TAIL_X - NOSE_X), 0, 0])
+    mesh.merge_vertices(digits_vertex=4)
+    mesh.remove_unreferenced_vertices()
+    trimesh.repair.fix_normals(mesh)
     return mesh
+
+
+CREASE_DEG = 38.0  # edges sharper than this stay hard (wing edges, fin edges, canopy frame)
+
+
+def corner_normals(mesh: trimesh.Trimesh, crease_deg: float = CREASE_DEG) -> np.ndarray:
+    """Per-corner normals: each corner averages (area-weighted) only the neighbouring faces
+    within the crease angle, so curved panels shade smoothly and hard edges stay crisp."""
+    fn = mesh.face_normals
+    area = mesh.area_faces
+    faces = mesh.faces
+    incident = [[] for _ in range(len(mesh.vertices))]
+    for fi, f in enumerate(faces):
+        for v in f:
+            incident[v].append(fi)
+    cos_c = np.cos(np.radians(crease_deg))
+    out = np.empty((len(faces), 3, 3))
+    for fi, f in enumerate(faces):
+        for k, v in enumerate(f):
+            nbrs = np.array(incident[v])
+            keep = nbrs[fn[nbrs] @ fn[fi] >= cos_c]
+            acc = (fn[keep] * area[keep, None]).sum(axis=0)
+            length = np.linalg.norm(acc)
+            out[fi, k] = acc / length if length > 1e-9 else fn[fi]
+    return out
 
 
 def classify(mesh: trimesh.Trimesh) -> np.ndarray:
@@ -108,22 +138,51 @@ def to_godot(vertices: np.ndarray) -> np.ndarray:
     return v
 
 
+def to_godot_dir(normals: np.ndarray) -> np.ndarray:
+    """Same axis swap for direction vectors (no scale or offset). A cyclic swap keeps winding."""
+    return normals[:, [1, 2, 0]]
+
+
+def part_mesh(mesh: trimesh.Trimesh, idx: np.ndarray, normals: np.ndarray) -> trimesh.Trimesh:
+    """Mesh for one paint region carrying the per-corner normals. Corners that share a
+    position and normal are welded, so only true hard edges duplicate vertices."""
+    corners = mesh.vertices[mesh.faces[idx]].reshape(-1, 3)
+    corner_n = normals[idx].reshape(-1, 3)
+    key = np.round(np.hstack([corners * 1e3, corner_n * 1e3])).astype(np.int64)
+    _, first, inverse = np.unique(key, axis=0, return_index=True, return_inverse=True)
+    return trimesh.Trimesh(
+        vertices=to_godot(corners[first]),
+        faces=inverse.reshape(-1, 3),
+        vertex_normals=to_godot_dir(corner_n[first]),
+        process=False,
+    )
+
+
 def convert(stl_name: str, out_name: str) -> None:
     mesh = prepare(trimesh.load(SRC / stl_name, force="mesh"))
     regions = classify(mesh)
+    normals = corner_normals(mesh)
     scene = trimesh.Scene()
-    for name, rgba in PREVIEW.items():
-        idx = np.nonzero(regions == name)[0]
-        if len(idx) == 0:
-            continue
-        part = mesh.submesh([idx], append=True)
-        part.vertices = to_godot(part.vertices)
+
+    def add(name: str, part: trimesh.Trimesh, rgba) -> None:
         part.visual = trimesh.visual.TextureVisuals(
             material=trimesh.visual.material.PBRMaterial(name=name, baseColorFactor=rgba, metallicFactor=0.4, roughnessFactor=0.5)
         )
         scene.add_geometry(part, node_name=name, geom_name=name)
+
+    for name, rgba in PREVIEW.items():
+        idx = np.nonzero(regions == name)[0]
+        if len(idx) == 0:
+            continue
+        add(name, part_mesh(mesh, idx, normals), rgba)
         print(f"  {out_name}: {name:8s} {len(idx):5d} faces")
-    scene.export(OUT / out_name)
+    # Ink outline hull: the whole welded mesh with fully smoothed normals, so the
+    # inverted-hull outline (grown along normals) never splits open at hard edges.
+    hull = trimesh.Trimesh(vertices=to_godot(mesh.vertices), faces=mesh.faces.copy(),
+                           vertex_normals=to_godot_dir(mesh.vertex_normals), process=False)
+    add("outline", hull, (0.0, 0.0, 0.0, 1.0))
+    print(f"  {out_name}: outline  {len(mesh.faces):5d} faces, watertight={mesh.is_watertight}")
+    scene.export(OUT / out_name, include_normals=True)
 
 
 if __name__ == "__main__":

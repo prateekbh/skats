@@ -141,6 +141,8 @@ func _draw() -> void:
 		return
 
 	var fwd := p.forward()
+	if p.boosting:
+		_draw_speed_lines(vs)
 	_draw_targets(p, cam, vs, ui)
 
 	# Gun reticle, projected where the cannons converge.
@@ -177,6 +179,18 @@ func _draw() -> void:
 
 	_draw_radar(p, Vector2(110 * ui + 10, vs.y - 110 * ui - 10), 95 * ui)
 	_draw_status(p, Vector2(vs.x - 300 * ui - 20, vs.y - 150 * ui - 10), ui)
+
+
+## Anime-style speed lines streaking in from the screen edges while on afterburner.
+func _draw_speed_lines(vs: Vector2) -> void:
+	var c := vs * 0.5
+	var r_out := vs.length() * 0.55
+	for k in 34:
+		var a := randf() * TAU
+		var dir := Vector2(cos(a), sin(a))
+		var r_in := r_out * randf_range(0.48, 0.72)
+		var w := randf_range(1.0, 3.0)
+		draw_line(c + dir * r_in, c + dir * r_out, Color(1, 1, 1, randf_range(0.12, 0.3)), w)
 
 
 func _text(pos: Vector2, s: String, size: int, col: Color, align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:

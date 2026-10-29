@@ -71,6 +71,34 @@ static func build(parent: Node3D) -> Dictionary:
 	}
 
 
+const CelShader := preload("res://shaders/cel.gdshader")
+
+
+## Cel-shaded material for the imported airframe.
+static func _cel(c: Color, shadow: Color, gloss: float, rim: float, glow := 0.0) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = CelShader
+	m.set_shader_parameter("albedo", c)
+	m.set_shader_parameter("shadow_tint", shadow)
+	m.set_shader_parameter("gloss_strength", gloss)
+	m.set_shader_parameter("rim_strength", rim)
+	if glow > 0.0:
+		m.set_shader_parameter("emission_color", c)
+		m.set_shader_parameter("emission_energy", glow)
+	return m
+
+
+## Black inverted-hull ink line, grown along the outline mesh's fully smoothed normals.
+static func _ink(thickness: float) -> StandardMaterial3D:
+	var ink := StandardMaterial3D.new()
+	ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ink.albedo_color = Color(0.0, 0.0, 0.0)
+	ink.cull_mode = BaseMaterial3D.CULL_FRONT
+	ink.grow = true
+	ink.grow_amount = thickness
+	return ink
+
+
 static func _paint(c: Color, metallic: float, roughness: float, rim: float) -> StandardMaterial3D:
 	var m := MeshKit.toon(c, metallic, roughness)
 	# A cool rim light keeps the black airframe readable against a dark dusk sky.
@@ -277,19 +305,17 @@ static func _build_hardpoints(root: Node3D, steel: Material, white: Material, re
 
 ## Builds the imported airframe: both wing poses, cel-shaded paint, turbines and afterburners.
 static func _build_imported(root: Node3D) -> Dictionary:
-	# Glossy black: low roughness so the toon specular draws crisp white highlights.
+	# Cel-shaded paint per region (shaders/cel.gdshader). Glossy black gets the strongest
+	# highlight and rim so the airframe reads like the show's inked cels.
 	var palette := {
-		"body": _paint(BLACK, 0.45, 0.22, 0.5),
-		"cockpit": _paint(RED, 0.25, 0.3, 0.25),
-		"engine": _paint(RED, 0.25, 0.3, 0.25),
-		"stripe": _paint(BLUE, 0.3, 0.3, 0.3),
-		"nozzle": MeshKit.toon(Color(0.03, 0.03, 0.04), 0.6, 0.5),
+		"body": _cel(BLACK, Color(0.55, 0.55, 0.75), 0.85, 0.28),
+		"cockpit": _cel(RED, Color(0.55, 0.3, 0.45), 0.7, 0.25),
+		"engine": _cel(RED, Color(0.55, 0.3, 0.45), 0.7, 0.25),
+		"stripe": _cel(BLUE, Color(0.5, 0.5, 0.75), 0.7, 0.3),
+		"nozzle": _cel(Color(0.03, 0.03, 0.04), Color(0.6, 0.6, 0.7), 0.3, 0.1),
+		"glass": _cel(GLASS, Color(0.5, 0.55, 0.85), 1.2, 0.4, 0.35),
+		"outline": _ink(INK * 1.4),
 	}
-	var glass := MeshKit.glass(GLASS)
-	glass.roughness = 0.05
-	glass.emission_energy_multiplier = 0.3
-	MeshKit.outlined(glass, INK)
-	palette["glass"] = glass
 
 	var swept := _load_airframe(MODEL_SWEPT, palette)
 	var open := _load_airframe(MODEL_OPEN, palette)

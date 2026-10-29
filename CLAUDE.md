@@ -20,10 +20,15 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   `godot --headless --path . --import` then `godot --headless --path . -- --autotest --god --seconds=30`.
   CI (`.github/workflows/web.yml`) runs the same smoke test, exports for web and deploys to Pages.
 - Screenshots need a display: `xvfb-run godot --path . --rendering-driver opengl3 -- --showcase=<dir>`
-  (TurboKat angles), `--snap=<file> [--intro --snap-at=<s>]` (title or intro frames).
+  (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--snap=<file> [--intro --snap-at=<s>]`
+  (title or intro frames).
 - Everything visual is generated in code or by the scripts in `tools/` (re-run them, don't hand-edit
   their outputs): `convert_turbokat.py` (3D model and paint), `prepare_launch_art.py` (launch-screen
   cut-outs, portraits and the traced logo).
-- Keep the web budget in mind: one MultiMesh per bullet type, CPU particles only, no real-time shadows.
+- Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
+  created per shot or per explosion. Effects go through the pooled `VFX` system
+  (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.
+- The TurboKat is cel-shaded with `shaders/cel.gdshader` plus an ink-outline hull exported by the
+  converter (crease-angle normals for the paint regions, fully smooth normals for the outline).
 - The launch screen is `web/shell.html` (a custom Godot HTML shell); its art and music live in
   `web/launch/` and are copied next to `index.html` by CI.

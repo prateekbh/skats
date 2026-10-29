@@ -9,6 +9,7 @@ extends Node
 ##   --god                 invulnerable player with perfect aim (tests mission logic, not skill)
 ##   --snap=<file.png>     save a screenshot of the title screen after 4 s, then quit
 ##                         (add --intro to capture the launch cinematic, --snap-at=<s> to pick the moment)
+##   --fxshow=<dir>        photograph explosions and effects at several moments, then quit
 ##   --showcase=<dir>      photograph the TurboKat from several angles into <dir>, then quit
 
 enum State { INTRO, TITLE, PLAYING, PAUSED, DEBRIEF }
@@ -54,6 +55,8 @@ func _ready() -> void:
 	_build_ui()
 	if _opts.has("showcase"):
 		_showcase.call_deferred()
+	elif _opts.has("fxshow"):
+		_fx_showcase.call_deferred()
 	elif _autotest:
 		start_episode(Game.episode_by_id(_opts.get("episode", "ep01")))
 	elif _opts.has("snap") and not _opts.has("intro"):
@@ -160,6 +163,13 @@ func _clear_world() -> void:
 		n.queue_free()
 
 
+## A split-second freeze on big kills so impacts land with weight.
+func hit_stop(real_seconds: float) -> void:
+	Engine.time_scale = 0.05
+	get_tree().create_timer(real_seconds, true, false, true).timeout.connect(func():
+		Engine.time_scale = 0.35 if _slowmo_until > Time.get_ticks_msec() else 1.0)
+
+
 func slow_motion(real_seconds: float) -> void:
 	Engine.time_scale = 0.35
 	_slowmo_until = Time.get_ticks_msec() + int(real_seconds * 1000.0)
@@ -223,6 +233,8 @@ func _on_player_destroyed() -> void:
 
 
 func _on_target_killed(t: Target) -> void:
+	if t.score >= 300 and not _autotest:
+		hit_stop(0.07)
 	if t is Creepling:
 		combat.explode(t.global_position, 2.0 if t.heavy else 1.1)
 		var r := randf()
@@ -432,8 +444,7 @@ func _intro_step(delta: float) -> void:
 		Sfx.play("missile", 4.0, 0.55)
 		Sfx.play("boom", 0.0, 0.6)
 		camera.add_shake(1.8)
-		combat._burst(hatch, combat._smoke_mat, 40, 2.8, Vector2(14, 40), Vector2(10, 20), 2.6,
-			[Color(0.5, 0.42, 0.35, 0.0), Color(0.45, 0.38, 0.32, 0.65), Color(0.4, 0.35, 0.3, 0.0)], Vector3(0, 5, 0), 1.2))
+		combat.vfx.dust(hatch, 1.4))
 	_intro_once("logo", INTRO_EMERGE + 2.4, menu.slam_logo)
 
 	# Camera: low on the yard floor watching the hatch, then swinging in behind the climb.
@@ -467,6 +478,35 @@ func _finish_intro() -> void:
 	city.set_hatch(0.0)
 	Sfx.set_engine(false, 0, 0)
 	_show_title()
+
+
+## Sets off effects in front of a fixed camera and saves frames at set moments.
+func _fx_showcase() -> void:
+	_show_title()
+	menu.hide_all()
+	set_process(false)
+	player.set_process(false)
+	player.visible = false
+	camera.shot = "script"
+	var at := Vector3(300, 420, 300)
+	camera.global_position = at + Vector3(0, 6, 70)
+	camera.look_at(at, Vector3.UP)
+	combat.explode(at, 1.6)
+	combat.explode(at + Vector3(-34, 4, -10), 0.8)
+	for k in 5:
+		combat.spark(at + Vector3(28 + k * 3, -8 + k * 2, 8), 1.0)
+	var trail_from := at + Vector3(-60, -20, 10)
+	for k in 40:
+		combat.vfx.trail(trail_from + Vector3(k * 2.5, k * 0.6, 0) * 2.0)
+	var moments := [0.06, 0.18, 0.4, 0.8, 1.5]
+	var t := 0.0
+	for m in moments:
+		while t < m:
+			await get_tree().process_frame
+			t += get_process_delta_time()
+		get_viewport().get_texture().get_image().save_png("%s/fx_%03d.png" % [_opts.fxshow, int(m * 100)])
+		print("[fxshow] ", m)
+	get_tree().quit()
 
 
 # --- autopilot (title screen flyby and automated tests) -----------------------------

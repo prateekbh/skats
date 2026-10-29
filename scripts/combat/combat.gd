@@ -24,8 +24,10 @@ var _missiles: Array[Dictionary] = []
 var _pickups: Array[Node3D] = []
 var _player_mm: MultiMesh
 var _enemy_mm: MultiMesh
-var _fire_mat: StandardMaterial3D
-var _smoke_mat: StandardMaterial3D
+var _missile_pool: Array[Node3D] = []
+var _mega_pool: Array[Node3D] = []
+## Pooled cartoon effects (explosions, hit stars, smoke trails).
+var vfx: VFX
 var _armor_ping_cd := 0.0
 var _armor_msg_cd := 0.0
 
@@ -36,8 +38,8 @@ var on_message: Callable
 func _ready() -> void:
 	_player_mm = _make_tracer_mm(Color(1.0, 0.9, 0.45), Vector3(0.28, 0.28, 7.0))
 	_enemy_mm = _make_tracer_mm(Color(1.0, 0.25, 0.2), Vector3(0.9, 0.9, 4.5))
-	_fire_mat = MeshKit.particle_material(true)
-	_smoke_mat = MeshKit.particle_material(false)
+	vfx = VFX.new()
+	add_child(vfx)
 
 
 func _make_tracer_mm(color: Color, size: Vector3) -> MultiMesh:
@@ -119,9 +121,9 @@ func clear() -> void:
 	targets.clear()
 	_bullets.clear()
 	for m in _missiles:
-		if is_instance_valid(m.node):
-			m.node.queue_free()
+		_recycle_missile(m)
 	_missiles.clear()
+	vfx.clear()
 	for p in _pickups:
 		if is_instance_valid(p):
 			p.queue_free()
@@ -171,7 +173,7 @@ func _update_bullets(dt: float) -> void:
 					t.take_damage(b.dmg, p1)
 					if not was_armored:
 						stats.hits += 1
-						spark(p1, Color(1.0, 0.8, 0.4), 6)
+						spark(p1)
 					hit = true
 					break
 		elif player_alive and seg_sphere(p0, p1, pp, 3.5 + b.size * 0.5):
@@ -179,7 +181,7 @@ func _update_bullets(dt: float) -> void:
 			hit = true
 		if not hit and p1.y < city.height_at(p1.x, p1.z):
 			if p1.distance_squared_to(pp) < 1500.0 * 1500.0:
-				spark(p1, Color(0.9, 0.85, 0.7), 4)
+				spark(p1, 0.6)
 			hit = true
 		if hit or b.life <= 0.0:
 			_bullets.remove_at(i)
@@ -208,42 +210,35 @@ func _draw_bullets() -> void:
 # --- missiles ---------------------------------------------------------------------
 
 ## Fires a homing missile. `target` may be null (dumb-fire). `mega` = big special missile.
+## Missile bodies are pooled and reused; their exhaust is drawn by the VFX puff pool.
 func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Target, mega := false) -> void:
+	var pool: Array[Node3D] = _mega_pool if mega else _missile_pool
+	var node: Node3D = pool.pop_back() if not pool.is_empty() else _build_missile(mega)
+	node.visible = true
+	node.global_position = pos
+	safe_look(node, dir)
+	_missiles.append({
+		"node": node, "dir": dir.normalized(), "speed": launch_speed + 30.0,
+		"target": target, "life": 7.0, "mega": mega, "arm": 0.15, "trail": 0.0,
+	})
+	Sfx.play("missile", -2.0 if mega else -5.0, 0.8 if mega else 1.0)
+
+
+func _build_missile(mega: bool) -> Node3D:
 	var node := Node3D.new()
 	add_child(node)
-	node.global_position = pos
 	var body_mat := MeshKit.toon(Color(0.9, 0.9, 0.92) if not mega else Color(0.95, 0.75, 0.15), 0.4, 0.4)
 	var s := 1.8 if mega else 1.0
 	MeshKit.part(node, MeshKit.cyl(0.25 * s, 0.25 * s, 3.2 * s, 8), body_mat, Vector3.ZERO, Vector3(-PI / 2, 0, 0))
 	MeshKit.part(node, MeshKit.cyl(0.0, 0.25 * s, 0.8 * s, 8), MeshKit.toon(Color(0.9, 0.2, 0.15)), Vector3(0, 0, -2.0 * s), Vector3(-PI / 2, 0, 0))
 	MeshKit.part(node, MeshKit.sphere(0.5 * s, 8), MeshKit.glow(Color(1.0, 0.7, 0.3), true), Vector3(0, 0, 1.8 * s))
-	var trail := _make_trail(mega)
-	add_child(trail)
-	trail.global_position = pos
-	safe_look(node, dir)
-	_missiles.append({
-		"node": node, "trail": trail, "dir": dir.normalized(), "speed": launch_speed + 30.0,
-		"target": target, "life": 7.0, "mega": mega, "arm": 0.15,
-	})
-	Sfx.play("missile", -2.0 if mega else -5.0, 0.8 if mega else 1.0)
+	return node
 
 
-func _make_trail(mega: bool) -> CPUParticles3D:
-	var p := CPUParticles3D.new()
-	p.amount = 90 if mega else 60
-	p.lifetime = 1.4
-	p.local_coords = false
-	p.mesh = _quad(_smoke_mat)
-	p.direction = Vector3.ZERO
-	p.spread = 180.0
-	p.initial_velocity_min = 0.5
-	p.initial_velocity_max = 3.0
-	p.gravity = Vector3(0, 1.5, 0)
-	p.scale_amount_min = 1.2 if mega else 0.8
-	p.scale_amount_max = 2.0 if mega else 1.4
-	p.scale_amount_curve = _curve(1.0, 4.0)
-	p.color_ramp = _gradient([Color(1.0, 0.85, 0.5, 0.9), Color(0.7, 0.7, 0.72, 0.5), Color(0.6, 0.6, 0.65, 0.0)])
-	return p
+func _recycle_missile(m: Dictionary) -> void:
+	var node: Node3D = m.node
+	node.visible = false
+	(_mega_pool if m.mega else _missile_pool).append(node)
 
 
 func _update_missiles(dt: float) -> void:
@@ -264,8 +259,12 @@ func _update_missiles(dt: float) -> void:
 		var p1: Vector3 = p0 + m.dir * m.speed * dt
 		node.global_position = p1
 		safe_look(node, m.dir)
-		var trail: CPUParticles3D = m.trail
-		trail.global_position = p1
+		# Exhaust: a puff every few metres of flight.
+		m.trail += m.speed * dt
+		var spacing := 4.0 if m.mega else 5.0
+		while m.trail >= spacing:
+			m.trail -= spacing
+			vfx.trail(p1 - m.dir * m.trail, m.mega)
 		var boom := false
 		if m.arm <= 0.0:
 			for t in targets:
@@ -283,95 +282,26 @@ func _update_missiles(dt: float) -> void:
 						t.take_damage(220.0, t.global_position)
 			else:
 				explode(p1, 1.2)
-			trail.emitting = false
-			get_tree().create_timer(1.6).timeout.connect(trail.queue_free)
-			node.queue_free()
+			_recycle_missile(m)
 			_missiles.remove_at(i)
 
 
-# --- effects ----------------------------------------------------------------------
-
-func _quad(mat: Material) -> QuadMesh:
-	var q := QuadMesh.new()
-	q.size = Vector2.ONE
-	q.material = mat
-	return q
-
-
-func _curve(start: float, end: float) -> Curve:
-	var c := Curve.new()
-	c.max_value = maxf(start, end)
-	c.add_point(Vector2(0, start))
-	c.add_point(Vector2(1, end))
-	return c
-
-
-func _gradient(colors: Array) -> Gradient:
-	var g := Gradient.new()
-	var offsets := PackedFloat32Array()
-	var cols := PackedColorArray()
-	for k in colors.size():
-		offsets.append(float(k) / (colors.size() - 1))
-		cols.append(colors[k])
-	g.offsets = offsets
-	g.colors = cols
-	return g
-
-
-func _burst(pos: Vector3, mat: Material, amount: int, life: float, vel: Vector2, size: Vector2, grow: float, colors: Array, gravity := Vector3.ZERO, damping := 0.0) -> CPUParticles3D:
-	var p := CPUParticles3D.new()
-	p.one_shot = true
-	p.explosiveness = 0.95
-	p.amount = maxi(amount, 1)
-	p.lifetime = life
-	p.local_coords = false
-	p.mesh = _quad(mat)
-	p.direction = Vector3.UP
-	p.spread = 180.0
-	p.initial_velocity_min = vel.x
-	p.initial_velocity_max = vel.y
-	p.gravity = gravity
-	p.damping_min = damping
-	p.damping_max = damping
-	p.scale_amount_min = size.x
-	p.scale_amount_max = size.y
-	p.scale_amount_curve = _curve(1.0, grow)
-	p.color_ramp = _gradient(colors)
-	add_child(p)
-	p.global_position = pos
-	p.emitting = true
-	get_tree().create_timer(life + 0.5).timeout.connect(p.queue_free)
-	return p
-
+# --- effects (drawn by the pooled VFX system) -----------------------------------------
 
 func explode(pos: Vector3, scale := 1.0) -> void:
-	var s := scale
-	_burst(pos, _fire_mat, int(26 * s), 0.9, Vector2(12, 45) * s, Vector2(5, 10) * s, 2.2,
-		[Color(1, 1, 0.8, 1), Color(1, 0.6, 0.15, 0.9), Color(0.8, 0.15, 0.05, 0.0)], Vector3(0, 6, 0), 2.0 * s)
-	_burst(pos, _smoke_mat, int(16 * s), 2.6, Vector2(6, 22) * s, Vector2(7, 12) * s, 3.0,
-		[Color(0.3, 0.27, 0.27, 0.0), Color(0.2, 0.19, 0.2, 0.75), Color(0.15, 0.15, 0.17, 0.0)], Vector3(0, 8, 0), 1.5 * s)
-	_burst(pos, _fire_mat, int(18 * s), 0.7, Vector2(60, 140) * s, Vector2(0.8, 1.6), 0.3,
-		[Color(1, 0.95, 0.7, 1), Color(1, 0.5, 0.1, 0.0)], Vector3(0, -60, 0))
-	# Flash ball.
-	var flash := MeshKit.part(self, MeshKit.sphere(1.0, 12), MeshKit.glow(Color(1.0, 0.75, 0.4), true))
-	flash.global_position = pos
-	flash.scale = Vector3.ONE * 2.0 * s
-	var tw := create_tween()
-	tw.tween_property(flash, "scale", Vector3.ONE * 14.0 * s, 0.25)
-	tw.parallel().tween_property(flash.material_override, "albedo_color:a", 0.0, 0.3)
-	tw.tween_callback(flash.queue_free)
+	vfx.explosion(pos, scale)
 	if camera:
-		Sfx.play_at("boom", pos, camera.global_position, 2.0 + s * 2.0, randf_range(0.8, 1.1) / sqrt(s))
+		Sfx.play_at("boom", pos, camera.global_position, 2.0 + scale * 2.0, randf_range(0.8, 1.1) / sqrt(scale))
 		var d := pos.distance_to(camera.global_position)
-		camera.add_shake(clampf(s * 60.0 / maxf(d, 1.0), 0.0, 2.5))
+		camera.add_shake(clampf(scale * 60.0 / maxf(d, 1.0), 0.0, 2.5))
 
 
-func spark(pos: Vector3, color: Color, amount := 6) -> void:
-	_burst(pos, _fire_mat, amount, 0.35, Vector2(20, 60), Vector2(0.6, 1.2), 0.2, [color, Color(color, 0.0)], Vector3(0, -30, 0))
+func spark(pos: Vector3, intensity := 1.0) -> void:
+	vfx.hit(pos, intensity)
 
 
 func muzzle_flash(pos: Vector3) -> void:
-	_burst(pos, _fire_mat, 2, 0.06, Vector2(0, 4), Vector2(2.0, 3.0), 0.5, [Color(1, 0.9, 0.6, 1), Color(1, 0.6, 0.2, 0)])
+	vfx.muzzle(pos)
 
 
 ## Hits on armored parts spark grey and remind the player where to aim.
@@ -379,7 +309,7 @@ func armor_ping(point: Vector3) -> void:
 	if _armor_ping_cd > 0.0:
 		return
 	_armor_ping_cd = 0.08
-	spark(point, Color(0.7, 0.75, 0.85), 4)
+	vfx.ricochet(point)
 	if camera:
 		Sfx.play_at("armor", point, camera.global_position, -6.0)
 	if _armor_msg_cd <= 0.0 and on_message.is_valid():
