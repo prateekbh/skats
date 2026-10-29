@@ -297,7 +297,23 @@ func _update_lock(dt: float) -> void:
 				Sfx.play("lock", -10.0)
 
 
+## Variable-geometry wings: swept back at speed, spread open when slow (imported model only).
+const SWEEP_AT := 175.0
+const SPREAD_AT := 145.0
+var wings_swept := false
+
+
 func _effects(dt: float) -> void:
+	if _model.has("wings"):
+		var want := wings_swept
+		if speed > SWEEP_AT:
+			want = true
+		elif speed < SPREAD_AT:
+			want = false
+		if want != wings_swept:
+			wings_swept = want
+			_model.wings.swept.visible = wings_swept
+			_model.wings.open.visible = not wings_swept
 	for f in _model.fans:
 		(f as Node3D).rotate_z(dt * (8.0 + throttle * 30.0))
 	# Underwing missiles disappear as the magazine empties.

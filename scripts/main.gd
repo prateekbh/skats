@@ -339,7 +339,12 @@ func _showcase() -> void:
 		"rear_left": "-16,7,24", "front_right": "14,5,-22", "top": "0.1,30,2",
 		"side": "-30,2,0", "rear_low": "8,-4,26", "front_low": "-10,-2,-20",
 	}
+	views["swept_top"] = "0.1,30,2"
+	views["swept_rear_left"] = "-16,7,24"
 	for v_name in views:
+		if v_name.begins_with("swept"):
+			player.speed = 300.0 # past the wing-sweep threshold
+			player._effects(0.016)
 		camera.shot = "view:" + views[v_name]
 		for i in 3:
 			await get_tree().process_frame

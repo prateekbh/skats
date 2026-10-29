@@ -1,19 +1,26 @@
-# Custom TurboKat model (optional)
+# TurboKat model
 
-Put a glTF binary here as `turbokat.glb` and the game uses it in place of the
-procedural airframe in `scripts/player/turbokat_model.gd`. Without it, the procedural
-model is used.
+`turbokat_swept.glb` and `turbokat_open.glb` are the TurboKat airframe in its two wing poses.
+The game swaps between them with airspeed (`scripts/player/turbokat.gd`, `SWEEP_AT` / `SPREAD_AT`).
 
-1. On the model's Sketchfab page, check the **license** shown under the title.
-   - CC-BY / CC-BY-SA / CC0: fine to commit. Add the credit line below (CC-BY requires it).
-   - "Standard" / "Editorial" / not downloadable: **do not commit it** to this public repo.
-     Keep it local (it's covered by `.gitignore` until you remove that line) or skip it.
-2. Download → **glTF** (or "Autoconverted format (glb)"), and save it as `turbokat.glb`.
-3. Open the project in Godot once (or run `godot --headless --path . --import`) so it is imported.
-4. Tune the constants at the top of `turbokat_model.gd` if needed:
-   `CUSTOM_ROTATION_DEG` (nose must point to -Z), `CUSTOM_LENGTH`, `CUSTOM_NOZZLES`.
-   Check it with: `xvfb-run godot --path . --rendering-driver opengl3 -- --showcase=/tmp/shots`
+They are generated from the STL files in `source/` by:
+
+```bash
+pip install trimesh scipy shapely
+```
+
+```bash
+python3 tools/convert_turbokat.py
+```
+
+The converter turns the model to Godot's axes, scales it to 22 m and paints it region by region
+(body, cockpit, glass, engine, nozzle, stripe). Godot swaps each region for the cel-shaded
+palette in `scripts/player/turbokat_model.gd`. To repaint the jet, edit `classify()` in the
+converter, or the colour constants in the model script.
 
 ## Credits
 
-<!-- e.g. "SWAT Cat TurboKat plane" by <author> (https://sketchfab.com/...) licensed under CC-BY 4.0 -->
+"TurboKat from Swat Kats Fixed STL" by **RabbitXGT**
+(https://www.thingiverse.com/thing:4500382), a fix of the original model by **Captain_Ahab_62**,
+licensed under **Creative Commons Attribution** (CC BY). Changes: converted to glTF, re-oriented,
+scaled, cut along paint lines and painted.

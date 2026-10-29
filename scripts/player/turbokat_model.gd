@@ -1,34 +1,31 @@
 class_name TurboKatModel
 extends RefCounted
-## The TurboKat, built from faceted lofts and slabs. Nose points to -Z (Godot forward).
+## The TurboKat. Nose points to -Z (Godot forward).
 ##
-## Design notes from the show's model sheet:
-##   - flat black arrowhead body with hard facets (stealth-jet silhouette)
-##   - raised red cockpit pod with light-blue window panels, separated by red frames
-##   - red slit panels on the body and wings, lavender-blue leading-edge stripes
-##   - big round rear engines: red housings, white turbine rings, visible fan blades
-##   - hooked forward blades beside the cockpit and twin canted tail fins
+## By default this uses the imported airframe in assets/turbokat/ (CC-BY model by RabbitXGT /
+## Captain_Ahab_62, painted region by region by tools/convert_turbokat.py). It has two wing
+## poses, open and swept, which the jet swaps between with airspeed, as in the show.
+## If those files are missing, a procedural airframe is built instead (the _build_* functions).
+##
+## Paint scheme, taken from the show's hangar shot: glossy black airframe, red cockpit pod
+## with royal-blue glass, red panels, royal-blue wingtip panels and nose tip, red engine pods.
 ## All colours live in the constants below.
 
-const BLACK := Color(0.08, 0.08, 0.11)
+const BLACK := Color(0.07, 0.07, 0.1)
 const FACET := Color(0.11, 0.11, 0.14)
-const RED := Color(0.86, 0.1, 0.08)
-const BLUE := Color(0.58, 0.64, 1.0)
-const GLASS := Color(0.55, 0.8, 1.0)
+const RED := Color(0.85, 0.12, 0.09)
+const BLUE := Color(0.2, 0.3, 0.85)
+const GLASS := Color(0.28, 0.42, 0.95)
 const WHITE := Color(0.88, 0.88, 0.9)
 const STEEL := Color(0.35, 0.36, 0.4)
 
 const INK := 0.045 # outline thickness
 
-## Optional imported model. Drop a glTF export at this path (see assets/turbokat/README.md)
-## and it replaces the procedural airframe; engines, flames and lights are still added here.
-const CUSTOM_MODEL := "res://assets/turbokat/turbokat.glb"
-## Imported models are scaled to this nose-to-tail length (metres) to match the flight model.
-const CUSTOM_LENGTH := 22.0
-## Rotation applied to the imported model so its nose points to -Z. glTF faces +Z, hence 180°.
-const CUSTOM_ROTATION_DEG := Vector3(0, 180, 0)
-## Where the afterburners sit on the imported model (local metres, after scaling).
-const CUSTOM_NOZZLES: Array[Vector3] = [Vector3(-2.6, -0.6, 9.0), Vector3(2.6, -0.6, 9.0)]
+const MODEL_SWEPT := "res://assets/turbokat/turbokat_swept.glb"
+const MODEL_OPEN := "res://assets/turbokat/turbokat_open.glb"
+## Engine nozzle centres on the imported airframe (printed by tools/convert_turbokat.py).
+const NOZZLES: Array[Vector3] = [Vector3(-2.3, -0.34, 11.0), Vector3(2.3, -0.34, 11.0)]
+const NOZZLE_RADIUS := 0.85
 
 
 ## Returns {"root", "burners": Array[Node3D], "wingtips": Array[Vector3], "missiles": Array[Node3D], "fans": Array[Node3D]}.
@@ -36,8 +33,8 @@ static func build(parent: Node3D) -> Dictionary:
 	var root := Node3D.new()
 	root.name = "TurboKat"
 	parent.add_child(root)
-	if ResourceLoader.exists(CUSTOM_MODEL):
-		return _build_custom(root)
+	if ResourceLoader.exists(MODEL_SWEPT) and ResourceLoader.exists(MODEL_OPEN):
+		return _build_imported(root)
 
 	var black := _paint(BLACK, 0.55, 0.35, 0.55)
 	var facet := _paint(FACET, 0.5, 0.4, 0.45)
@@ -278,53 +275,88 @@ static func _build_hardpoints(root: Node3D, steel: Material, white: Material, re
 	return missiles
 
 
-## Uses an imported glTF airframe, auto-scaled to CUSTOM_LENGTH, plus procedural afterburners.
-static func _build_custom(root: Node3D) -> Dictionary:
-	var scene := load(CUSTOM_MODEL) as PackedScene
-	var model := scene.instantiate() as Node3D
-	var holder := Node3D.new()
-	holder.rotation_degrees = CUSTOM_ROTATION_DEG
-	root.add_child(holder)
-	holder.add_child(model)
-	var box := _visual_aabb(model, Transform3D())
-	var longest := maxf(box.size.x, maxf(box.size.y, box.size.z))
-	if longest > 0.0:
-		var s := CUSTOM_LENGTH / longest
-		model.scale = Vector3.ONE * s
-		model.position = -box.get_center() * s
+## Builds the imported airframe: both wing poses, cel-shaded paint, turbines and afterburners.
+static func _build_imported(root: Node3D) -> Dictionary:
+	# Glossy black: low roughness so the toon specular draws crisp white highlights.
+	var palette := {
+		"body": _paint(BLACK, 0.45, 0.22, 0.5),
+		"cockpit": _paint(RED, 0.25, 0.3, 0.25),
+		"engine": _paint(RED, 0.25, 0.3, 0.25),
+		"stripe": _paint(BLUE, 0.3, 0.3, 0.3),
+		"nozzle": MeshKit.toon(Color(0.03, 0.03, 0.04), 0.6, 0.5),
+	}
+	var glass := MeshKit.glass(GLASS)
+	glass.roughness = 0.05
+	glass.emission_energy_multiplier = 0.3
+	MeshKit.outlined(glass, INK)
+	palette["glass"] = glass
+
+	var swept := _load_airframe(MODEL_SWEPT, palette)
+	var open := _load_airframe(MODEL_OPEN, palette)
+	root.add_child(swept)
+	root.add_child(open)
+	swept.visible = false
+
+	var white := _paint(WHITE, 0.3, 0.35, 0.1)
+	var steel := _paint(STEEL, 0.7, 0.3, 0.1)
 	var burners: Array[Node3D] = []
-	var flame := MeshKit.glow(Color(1.0, 0.5, 0.18, 0.85), true)
-	var core := MeshKit.glow(Color(0.65, 0.85, 1.0, 0.9), true)
-	for p in CUSTOM_NOZZLES:
-		var pivot := Node3D.new()
-		pivot.position = p
-		root.add_child(pivot)
-		MeshKit.part(pivot, MeshKit.cyl(0.0, 0.85, 5.5, 12), flame, Vector3(0, 0, 2.75), Vector3(PI / 2, 0, 0))
-		MeshKit.part(pivot, MeshKit.cyl(0.0, 0.38, 2.6, 10), core, Vector3(0, 0, 1.3), Vector3(PI / 2, 0, 0))
-		burners.append(pivot)
-	var half := CUSTOM_LENGTH * 0.42
+	var fans: Array[Node3D] = []
+	for p in NOZZLES:
+		var e := _engine_face(root, p, NOZZLE_RADIUS, white, steel)
+		burners.append(e.burner)
+		fans.append(e.fan)
+
+	# Nav lights on the open-wing tips (port red, starboard green).
+	MeshKit.part(open, MeshKit.sphere(0.2, 6), MeshKit.glow(Color(1, 0.1, 0.1)), Vector3(-11.4, 0.1, 5.4))
+	MeshKit.part(open, MeshKit.sphere(0.2, 6), MeshKit.glow(Color(0.1, 1, 0.3)), Vector3(11.4, 0.1, 5.4))
+
 	return {
 		"root": root,
 		"burners": burners,
-		"fans": [],
+		"fans": fans,
 		"missiles": [],
-		"wingtips": [Vector3(-half, 0, CUSTOM_LENGTH * 0.4), Vector3(half, 0, CUSTOM_LENGTH * 0.4)],
+		"wings": {"open": open, "swept": swept},
+		"wingtips": [Vector3(-7.8, 0.1, 7.6), Vector3(7.8, 0.1, 7.6)],
 	}
 
 
-static func _visual_aabb(node: Node, xf: Transform3D) -> AABB:
-	var out := AABB()
-	var first := true
-	var t := xf
-	if node is Node3D:
-		t = xf * (node as Node3D).transform
-	if node is VisualInstance3D:
-		out = t * (node as VisualInstance3D).get_aabb()
-		first = false
-	for c in node.get_children():
-		var sub := _visual_aabb(c, t)
-		if sub.size == Vector3.ZERO:
-			continue
-		out = sub if first else out.merge(sub)
-		first = false
-	return out
+## Instantiates one wing pose and swaps each region's material for the palette entry of the same name.
+static func _load_airframe(path: String, palette: Dictionary) -> Node3D:
+	var node := (load(path) as PackedScene).instantiate() as Node3D
+	for mi in node.find_children("*", "MeshInstance3D", true, false):
+		var mesh := (mi as MeshInstance3D).mesh
+		for i in mesh.get_surface_count():
+			var mat := mesh.surface_get_material(i)
+			var key := mat.resource_name if mat else ""
+			if not palette.has(key):
+				key = str(mi.name).to_lower()
+			if palette.has(key):
+				(mi as MeshInstance3D).set_surface_override_material(i, palette[key])
+	return node
+
+
+## White turbine ring, spinning fan and afterburner flame set into an engine nozzle.
+static func _engine_face(root: Node3D, pos: Vector3, r: float, white: Material, steel: Material) -> Dictionary:
+	var e := Node3D.new()
+	e.position = pos
+	root.add_child(e)
+	var ring := TorusMesh.new()
+	ring.inner_radius = r * 0.72
+	ring.outer_radius = r * 1.02
+	ring.rings = 20
+	ring.ring_segments = 6
+	MeshKit.part(e, ring, white, Vector3(0, 0, -0.05), Vector3(PI / 2, 0, 0))
+	MeshKit.part(e, MeshKit.cyl(r * 0.75, r * 0.75, 0.08, 16), MeshKit.toon(Color(0.02, 0.02, 0.03)), Vector3(0, 0, -0.25), Vector3(PI / 2, 0, 0))
+	var fan := Node3D.new()
+	fan.position = Vector3(0, 0, -0.15)
+	e.add_child(fan)
+	for k in 9:
+		var a := TAU * k / 9.0
+		MeshKit.part(fan, MeshKit.box(Vector3(0.12, r * 0.7, 0.03)), steel, Vector3(-sin(a), cos(a), 0) * r * 0.38, Vector3(0, 0.35, a))
+	MeshKit.part(fan, MeshKit.cyl(0.0, r * 0.22, 0.35, 10), steel, Vector3(0, 0, 0.12), Vector3(PI / 2, 0, 0))
+	var burner := Node3D.new()
+	burner.position = Vector3(0, 0, 0.05)
+	e.add_child(burner)
+	MeshKit.part(burner, MeshKit.cyl(0.0, r * 0.8, 5.5, 12), MeshKit.glow(Color(1.0, 0.5, 0.18, 0.85), true), Vector3(0, 0, 2.75), Vector3(PI / 2, 0, 0))
+	MeshKit.part(burner, MeshKit.cyl(0.0, r * 0.42, 2.6, 10), MeshKit.glow(Color(0.65, 0.85, 1.0, 0.9), true), Vector3(0, 0, 1.3), Vector3(PI / 2, 0, 0))
+	return {"burner": burner, "fan": fan}

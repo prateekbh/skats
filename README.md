@@ -35,7 +35,7 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 
 ## What's in v0.1
 
-- **The TurboKat:** a faceted black airframe with the red cockpit pod, blue-glass canopy panels, lavender edge stripes, big red turbofans with spinning blades, and underwing missiles that disappear as you fire them. Cel-shaded with cartoon outlines.
+- **The TurboKat:** a community 3D model painted in the show's colours (glossy black, red cockpit pod with royal-blue glass, blue wingtips and nose, red engines with spinning turbines). Its wings swing back at high speed and spread open when slow, and it's cel-shaded with cartoon outlines. A procedural fallback airframe is built if the model files are missing.
 - **Arcade flight model:** bank-to-turn, auto-level, afterburner, speed gained in dives and lost in climbs.
 - **Weapons:** twin cannons with overheat, lock-on homing missiles, and the Mega-Missile.
 - **Megakat City:** procedural downtown with lit windows, street lamps, Enforcer HQ, City Hall, the bay, and the salvage yard where the hidden hangar is.
@@ -44,6 +44,12 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 - **Presentation:** HUD with radar, lock-on and warnings; briefing and debrief screens with ranks and saved best scores; all sound effects synthesized at runtime.
 
 See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan and roadmap.
+
+## Credits
+
+- TurboKat 3D model: "TurboKat from Swat Kats Fixed STL" by RabbitXGT
+  (https://www.thingiverse.com/thing:4500382), based on Captain_Ahab_62's model, CC BY.
+  Converted and painted for the game, see [`assets/turbokat/`](assets/turbokat/README.md).
 
 ## Project layout
 
