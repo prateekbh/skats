@@ -252,11 +252,52 @@ func _weapons(dt: float) -> void:
 	if player_control and Input.is_action_just_pressed("cycle_special") and Arsenal.SPECIALS.size() > 1:
 		special_index = (special_index + 1) % Arsenal.SPECIALS.size()
 		Sfx.play("beep", -8.0, 0.8)
+		var hud = get_tree().get_first_node_in_group("hud")
+		if hud:
+			hud.message("%s: %s" % [str(selected_special().name).to_upper(), selected_special().blurb], 1.6)
 	var special := selected_special()
 	if player_control and Input.is_action_just_pressed("fire_special") and special_ammo.get(special.id, 0) > 0 and _missile_cd <= 0.0:
 		special_ammo[special.id] -= 1
 		_missile_cd = 0.6
-		combat.fire_missile(global_transform * Vector3(0, -1.8, -1.0), forward(), speed, lock_target if locked else null, special)
+		_fire_special(special)
+
+
+## Fires the selected special. The Buzz-Saw "barrage" sends one saw at each target in
+## front of the jet (up to its volley size); everything else fires a single missile.
+func _fire_special(def: Dictionary) -> void:
+	var launch := global_transform * Vector3(0, -1.8, -1.0)
+	if def.behaviour != "barrage":
+		combat.fire_missile(launch, forward(), speed, lock_target if locked else null, def)
+		return
+	var volley: int = def.volley
+	var picks := _volley_targets(volley)
+	for k in volley:
+		var side: float = float(k) - (volley - 1) * 0.5
+		var pos := global_transform * Vector3(side * 2.4, -1.2, -0.5)
+		var t: Target = picks[k % picks.size()] if not picks.is_empty() else null
+		var spread: Vector3 = global_transform.basis.x * side * 0.06 + global_transform.basis.y * 0.02
+		combat.fire_missile(pos, (forward() + spread).normalized(), speed, t, def)
+
+
+## Up to `count` targets in a wide cone ahead, nearest to the nose first.
+func _volley_targets(count: int) -> Array[Target]:
+	var fwd := forward()
+	var found: Array = []
+	for t in combat.targets:
+		if not t.alive or not t.lockable or t.invulnerable:
+			continue
+		var to := t.global_position - global_position
+		var d := to.length()
+		if d > LOCK_RANGE or d < 1.0:
+			continue
+		var a := fwd.angle_to(to / d)
+		if a < 0.5:
+			found.append([a, t])
+	found.sort_custom(func(x, y): return x[0] < y[0])
+	var out: Array[Target] = []
+	for f in found.slice(0, count):
+		out.append(f[1])
+	return out
 
 
 func selected_special() -> Dictionary:

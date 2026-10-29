@@ -26,6 +26,9 @@ var _player_mm: MultiMesh
 var _enemy_mm: MultiMesh
 ## Reusable missile bodies, keyed by weapon id.
 var _missile_pools := {}
+## Octopus Missile tentacle rigs: reusable, and the ones currently holding a captive.
+var _tentacle_pool: Array[Node3D] = []
+var _captures: Array[Dictionary] = []
 ## Pooled cartoon effects (explosions, hit stars, smoke trails).
 var vfx: VFX
 var _armor_ping_cd := 0.0
@@ -100,6 +103,19 @@ func add_target(t: Target, parent: Node = null) -> Target:
 	return t
 
 
+## The target struck by the segment p0→p1. When several overlap (a turret sitting on the
+## warship's hull), the smallest one wins, so weak points are never shadowed by the hull.
+func first_hit(p0: Vector3, p1: Vector3, extra_radius := 0.0) -> Target:
+	var best: Target = null
+	for t in targets:
+		if not t.alive:
+			continue
+		if t.hit_test(p0, p1) or (extra_radius > 0.0 and Combat.seg_sphere(p0, p1, t.global_position, t.radius + extra_radius)):
+			if best == null or t.radius < best.radius:
+				best = t
+	return best
+
+
 func living_count(filter := "") -> int:
 	var n := 0
 	for t in targets:
@@ -123,6 +139,10 @@ func clear() -> void:
 	for m in _missiles:
 		_recycle_missile(m)
 	_missiles.clear()
+	for c in _captures:
+		c.rig.visible = false
+		_tentacle_pool.append(c.rig)
+	_captures.clear()
 	vfx.clear()
 	for p in _pickups:
 		if is_instance_valid(p):
@@ -147,6 +167,7 @@ func _process(delta: float) -> void:
 	_armor_msg_cd -= delta
 	_update_bullets(delta)
 	_update_missiles(delta)
+	_update_captures(delta)
 	_update_pickups(delta)
 	_prune_targets()
 
@@ -167,15 +188,14 @@ func _update_bullets(dt: float) -> void:
 		b.life -= dt
 		var hit := false
 		if b.team == PLAYER_TEAM:
-			for t in targets:
-				if t.alive and t.hit_test(p0, p1):
-					var was_armored := t.invulnerable
-					t.take_damage(b.dmg, p1)
-					if not was_armored:
-						stats.hits += 1
-						spark(p1)
-					hit = true
-					break
+			var t := first_hit(p0, p1)
+			if t:
+				var was_armored := t.invulnerable
+				t.take_damage(b.dmg, p1)
+				if not was_armored:
+					stats.hits += 1
+					spark(p1)
+				hit = true
 		elif player_alive and seg_sphere(p0, p1, pp, 3.5 + b.size * 0.5):
 			player.take_damage(b.dmg)
 			hit = true
@@ -231,14 +251,61 @@ func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Targe
 	Sfx.play("missile", -2.0 if big else -5.0, 0.8 if big else 1.0)
 
 
+## Builds a missile body in its canon livery (see Arsenal for the swatkats.info notes).
 func _build_missile(def: Dictionary) -> Node3D:
 	var node := Node3D.new()
 	add_child(node)
 	var s: float = def.size
+	var fwd := Vector3(-PI / 2, 0, 0)
 	var body_mat := MeshKit.toon(def.color, 0.4, 0.4)
-	MeshKit.part(node, MeshKit.cyl(0.25 * s, 0.25 * s, 3.2 * s, 8), body_mat, Vector3.ZERO, Vector3(-PI / 2, 0, 0))
-	MeshKit.part(node, MeshKit.cyl(0.0, 0.25 * s, 0.8 * s, 8), MeshKit.toon(Color(0.9, 0.2, 0.15)), Vector3(0, 0, -2.0 * s), Vector3(-PI / 2, 0, 0))
+	var red := MeshKit.toon(Color(0.9, 0.2, 0.15))
+	var steel := MeshKit.toon(Color(0.7, 0.72, 0.78), 0.8, 0.25)
+	MeshKit.part(node, MeshKit.cyl(0.25 * s, 0.25 * s, 3.2 * s, 8), body_mat, Vector3.ZERO, fwd)
 	MeshKit.part(node, MeshKit.sphere(0.5 * s, 8), MeshKit.glow(Color(1.0, 0.7, 0.3), true), Vector3(0, 0, 1.8 * s))
+	for k in 4: # tail fins
+		var a := TAU * k / 4.0
+		MeshKit.part(node, MeshKit.box(Vector3(0.05, 0.6 * s, 0.6 * s)), body_mat, Vector3(sin(a), cos(a), 0) * 0.35 * s + Vector3(0, 0, 1.3 * s), Vector3(0, 0, a))
+	match def.model:
+		"octopus":
+			# Folded tentacles wrapped around a bulbous head.
+			MeshKit.part(node, MeshKit.sphere(0.45 * s, 10), body_mat, Vector3(0, 0, -1.8 * s))
+			for k in 6:
+				var a := TAU * k / 6.0
+				MeshKit.part(node, MeshKit.cyl(0.06 * s, 0.1 * s, 1.6 * s, 6), MeshKit.toon(def.color.darkened(0.25)),
+					Vector3(sin(a), cos(a), 0) * 0.3 * s + Vector3(0, 0, -0.9 * s), fwd)
+		"buzzsaw":
+			# Red casing with the grinning shark decal and the saw blade at the nose.
+			MeshKit.part(node, MeshKit.cyl(0.0, 0.25 * s, 0.7 * s, 8), red, Vector3(0, 0, -1.95 * s), fwd)
+			MeshKit.part(node, MeshKit.box(Vector3(0.36 * s, 0.08 * s, 0.7 * s)), MeshKit.toon(Color(0.95, 0.95, 0.95)), Vector3(0, -0.2 * s, -1.1 * s))
+			MeshKit.part(node, MeshKit.sphere(0.07 * s, 6), MeshKit.toon(Color(0.05, 0.05, 0.05)), Vector3(0.18 * s, 0.12 * s, -1.4 * s))
+			var saw := Node3D.new()
+			saw.name = "Spin"
+			saw.position = Vector3(0, 0, -2.3 * s)
+			node.add_child(saw)
+			MeshKit.part(saw, MeshKit.cyl(0.8 * s, 0.8 * s, 0.06, 14), steel, Vector3.ZERO, fwd)
+			for k in 10:
+				var a := TAU * k / 10.0
+				MeshKit.part(saw, MeshKit.box(Vector3(0.16 * s, 0.3 * s, 0.06)), steel, Vector3(sin(a), cos(a), 0) * 0.88 * s, Vector3(0, 0, -a))
+		"scrambler":
+			# Rounded discharge nose and the lightning-bolt marking.
+			MeshKit.part(node, MeshKit.sphere(0.3 * s, 10), MeshKit.toon(Color(0.85, 0.85, 0.9), 0.7, 0.3), Vector3(0, 0, -1.65 * s))
+			var bolt := PackedVector2Array()
+			for v in [Vector2(-0.12, -0.5), Vector2(0.1, -0.05), Vector2(-0.02, -0.02), Vector2(0.12, 0.5), Vector2(-0.1, 0.05), Vector2(0.02, 0.02)]:
+				bolt.append(v * s)
+			MeshKit.part(node, MeshKit.slab(bolt, 0.04),
+				MeshKit.glow(Color(1.0, 0.85, 0.1)), Vector3(0.26 * s, 0, -0.3 * s), Vector3(0, 0, PI / 2))
+		"slicer":
+			# Bladed nose: four steel cutting fins.
+			MeshKit.part(node, MeshKit.cyl(0.0, 0.25 * s, 0.9 * s, 8), steel, Vector3(0, 0, -2.05 * s), fwd)
+			for k in 4:
+				var a := TAU * k / 4.0 + PI / 4.0
+				MeshKit.part(node, MeshKit.box(Vector3(0.03, 0.55 * s, 1.0 * s)), steel, Vector3(sin(a), cos(a), 0) * 0.3 * s + Vector3(0, 0, -1.5 * s), Vector3(0, 0, a))
+		"matchhead":
+			# The match-like ball tip that ignites after launch.
+			MeshKit.part(node, MeshKit.sphere(0.42 * s, 12), MeshKit.glow(Color(1.0, 0.35, 0.1)), Vector3(0, 0, -1.9 * s))
+			MeshKit.part(node, MeshKit.sphere(0.55 * s, 12), MeshKit.glow(Color(1.0, 0.75, 0.2, 0.7), true), Vector3(0, 0, -1.9 * s))
+		_:
+			MeshKit.part(node, MeshKit.cyl(0.0, 0.25 * s, 0.8 * s, 8), red, Vector3(0, 0, -2.0 * s), fwd)
 	return node
 
 
@@ -267,6 +334,9 @@ func _update_missiles(dt: float) -> void:
 		var p1: Vector3 = p0 + m.dir * m.speed * dt
 		node.global_position = p1
 		safe_look(node, m.dir)
+		var spin := node.get_node_or_null("Spin")
+		if spin:
+			spin.rotate_z(dt * 40.0)
 		# Exhaust: a puff every few metres of flight.
 		var big: bool = def.size > 1.2
 		m.trail += m.speed * dt
@@ -276,10 +346,13 @@ func _update_missiles(dt: float) -> void:
 			vfx.trail(p1 - m.dir * m.trail, big)
 		var hit: Target = null
 		if m.arm <= 0.0:
-			for t in targets:
-				if t.alive and (t.hit_test(p0, p1) or Combat.seg_sphere(p0, p1, t.global_position, t.radius + 3.0)):
-					hit = t
-					break
+			# Proximity fuse: once close to its own target, a guided missile only goes for it,
+			# so a turret's hull can't intercept a missile aimed at the turret.
+			if tgt != null and p1.distance_to(tgt.global_position) < tgt.radius + 40.0:
+				if Combat.seg_sphere(p0, p1, tgt.global_position, tgt.radius + 6.0):
+					hit = tgt
+			else:
+				hit = first_hit(p0, p1, 3.0)
 		if hit or p1.y < city.height_at(p1.x, p1.z) or m.life <= 0.0:
 			_missile_hit(def, p1, hit)
 			_recycle_missile(m)
@@ -289,26 +362,84 @@ func _update_missiles(dt: float) -> void:
 ## Applies a missile's effect where it detonated. `hit` is null for ground or timeout.
 func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
 	match def.behaviour:
+		"capture":
+			# Octopus: restrain the target. A captured glider loses lift and falls.
+			vfx.hit(p, 1.5)
+			if hit:
+				hit.take_damage(def.damage, p)
+				var falls := hit is Creepling
+				hit.stun(60.0 if falls else def.hold)
+				hit.captured = true
+				_attach_tentacles(hit, def)
+		"barrage":
+			# Buzz-Saw: non-explosive cut, extra effective against wings.
+			vfx.hit(p, 1.8)
+			if hit:
+				var mult: float = def.wing_bonus if hit is Creepling else 1.0
+				hit.take_damage(def.damage * mult, p)
+		"scramble":
+			# Scrambler: a million-megavolt discharge shorts out everything nearby.
+			vfx.electric(p, def.radius)
+			if camera:
+				Sfx.play_at("armor", p, camera.global_position, 4.0, 0.5)
+			for t in targets:
+				if t.alive and t.global_position.distance_to(p) < def.radius + t.radius:
+					t.take_damage(def.damage, t.global_position)
+					t.stun(def.disable)
+		"pierce":
+			# Slicer: cuts through armor.
+			explode(p, 1.1)
+			if hit:
+				hit.take_damage(def.damage, p, true)
 		"blast":
+			# Match Head: explosive-incendiary.
 			explode(p, 3.2)
 			if hit:
 				hit.take_damage(def.damage, p)
 			for t in targets:
-				if t.alive and t.global_position.distance_to(p) < def.blast_radius + t.radius:
-					t.take_damage(def.blast_damage, t.global_position)
-		"stun":
-			vfx.hit(p, 2.0)
-			if hit:
-				hit.take_damage(def.get("damage", 0.0), p)
-				hit.stun(def.stun)
-		"pierce":
-			explode(p, 1.4)
-			if hit:
-				hit.take_damage(def.damage, p, true)
+				if t.alive and t.global_position.distance_to(p) < def.radius + t.radius:
+					t.take_damage(def.radius_damage, t.global_position)
+					t.ignite(4.0, def.burn)
 		_:
 			explode(p, 1.2)
 			if hit:
 				hit.take_damage(def.damage, p)
+
+
+# --- Octopus tentacle rigs (pooled, follow their captive) ------------------------------
+
+func _attach_tentacles(t: Target, def: Dictionary) -> void:
+	var rig: Node3D = _tentacle_pool.pop_back() if not _tentacle_pool.is_empty() else _build_tentacles(def)
+	rig.visible = true
+	rig.scale = Vector3.ONE * clampf(t.radius / 6.0, 0.8, 3.0)
+	_captures.append({"rig": rig, "target": t, "t": 0.0})
+
+
+func _build_tentacles(def: Dictionary) -> Node3D:
+	var rig := Node3D.new()
+	add_child(rig)
+	var mat := MeshKit.toon(def.color, 0.2, 0.5)
+	for k in 8:
+		var a := TAU * k / 8.0
+		var arm := MeshKit.part(rig, MeshKit.cyl(0.25, 0.5, 9.0, 6), mat, Vector3(sin(a), cos(a), 0) * 3.2, Vector3(0, 0, -a))
+		arm.rotation.x = 0.35
+	MeshKit.part(rig, MeshKit.sphere(2.0, 10), mat, Vector3(0, 0, -3.0))
+	return rig
+
+
+func _update_captures(dt: float) -> void:
+	for i in range(_captures.size() - 1, -1, -1):
+		var c := _captures[i]
+		var t = c.target
+		var rig: Node3D = c.rig
+		c.t += dt
+		if not is_instance_valid(t) or not t.alive or not t.captured:
+			rig.visible = false
+			_tentacle_pool.append(rig)
+			_captures.remove_at(i)
+			continue
+		rig.global_position = t.global_position
+		rig.rotation = Vector3(0, c.t * 1.5, sin(c.t * 4.0) * 0.2)
 
 
 # --- effects (drawn by the pooled VFX system) -----------------------------------------

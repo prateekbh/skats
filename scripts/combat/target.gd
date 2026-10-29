@@ -20,9 +20,15 @@ var velocity := Vector3.ZERO
 var is_objective := false
 ## Materials that flash white when hit (should be unique to this target).
 var flash_materials: Array[StandardMaterial3D] = []
-## Seconds left disabled by a stun missile: no AI, no firing.
+## Seconds left disabled (Octopus, Scrambler): no AI, no firing.
 var stunned := 0.0
+## Incendiary damage over time (Match Head): seconds left and damage per second.
+var burn_t := 0.0
+var burn_dps := 0.0
+## True while held by an Octopus Missile (Combat draws the tentacles).
+var captured := false
 var _flash := 0.0
+var _fx_t := 0.0
 
 
 func _process(delta: float) -> void:
@@ -32,8 +38,24 @@ func _process(delta: float) -> void:
 		for m in flash_materials:
 			m.emission_energy_multiplier = e
 	if alive:
+		_fx_t -= delta
+		if burn_t > 0.0:
+			burn_t -= delta
+			if not invulnerable:
+				hp -= burn_dps * delta
+				if hp <= 0.0:
+					take_damage(1.0, global_position, true)
+					return
+			if _fx_t <= 0.0:
+				_fx_t = 0.08
+				combat.vfx.burn(global_position)
 		if stunned > 0.0:
 			stunned -= delta
+			if stunned <= 0.0:
+				captured = false
+			elif not captured and _fx_t <= 0.0:
+				_fx_t = 0.15
+				combat.vfx.crackle(global_position)
 			stunned_tick(delta)
 		else:
 			tick(delta)
@@ -51,6 +73,12 @@ func stunned_tick(_dt: float) -> void:
 func stun(seconds: float) -> void:
 	if alive:
 		stunned = maxf(stunned, seconds)
+
+
+func ignite(seconds: float, dps: float) -> void:
+	if alive:
+		burn_t = maxf(burn_t, seconds)
+		burn_dps = maxf(burn_dps, dps)
 
 
 func set_max_hp(value: float) -> void:

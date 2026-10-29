@@ -6,10 +6,12 @@ extends Node
 ##   --episode=<id>        episode to autotest (default ep01)
 ##   --seconds=<n>         quit the autotest after n seconds (default 150)
 ##   --shots=<dir>         save screenshots to <dir> during the autotest (needs a display)
+##   --weapons             (with --autotest) fire each special missile at a target and report the result
 ##   --god                 invulnerable player with perfect aim (tests mission logic, not skill)
 ##   --snap=<file.png>     save a screenshot of the title screen after 4 s, then quit
 ##                         (add --intro to capture the launch cinematic, --snap-at=<s> to pick the moment)
 ##   --fxshow=<dir>        photograph explosions and effects at several moments, then quit
+##   --weaponshow=<dir>    photograph the special-missile models and their effects, then quit
 ##   --showcase=<dir>      photograph the TurboKat from several angles into <dir>, then quit
 
 enum State { INTRO, TITLE, PLAYING, PAUSED, DEBRIEF }
@@ -57,6 +59,8 @@ func _ready() -> void:
 		_showcase.call_deferred()
 	elif _opts.has("fxshow"):
 		_fx_showcase.call_deferred()
+	elif _opts.has("weaponshow"):
+		_weapon_showcase.call_deferred()
 	elif _autotest:
 		start_episode(Game.episode_by_id(_opts.get("episode", "ep01")))
 	elif _opts.has("snap") and not _opts.has("intro"):
@@ -509,6 +513,56 @@ func _fx_showcase() -> void:
 	get_tree().quit()
 
 
+## Lines up every missile model and shows the capture, discharge and burn effects.
+func _weapon_showcase() -> void:
+	_show_title()
+	menu.hide_all()
+	set_process(false)
+	player.set_process(false)
+	player.visible = false
+	camera.shot = "script"
+	var at := Vector3(300, 420, 300)
+	camera.global_position = at + Vector3(0, 3, 16)
+	camera.look_at(at + Vector3(0, -1, 0), Vector3.UP)
+	var defs: Array = [Arsenal.HOMING] + Arsenal.SPECIALS
+	var models: Array[Node3D] = []
+	for k in defs.size():
+		var m := combat._build_missile(defs[k])
+		m.global_position = at + Vector3(0, ((defs.size() - 1) * 0.5 - k) * 1.9, 0)
+		m.rotation = Vector3(0, PI / 2 - 0.25, 0) # side-on, nose to the right
+		models.append(m)
+	camera.global_position = at + Vector3(0, 0, 13)
+	camera.look_at(at, Vector3.UP)
+	for f in 3:
+		await get_tree().process_frame
+	get_viewport().get_texture().get_image().save_png("%s/missiles.png" % _opts.weaponshow)
+	for m in models:
+		m.queue_free()
+	# Each effect in its own close-up on a Creepling.
+	var defs_by_id := {}
+	for d in Arsenal.SPECIALS:
+		defs_by_id[d.id] = d
+	for shot in ["octopus", "scrambler", "matchhead"]:
+		var c := spawn_creepling(at, shot == "matchhead", at)
+		camera.global_position = at + Vector3(0, 6, 34 if shot != "matchhead" else 48)
+		camera.look_at(at, Vector3.UP)
+		if shot == "matchhead":
+			c.ignite(5.0, 0.5)
+		else:
+			combat._missile_hit(defs_by_id[shot], at + Vector3(0, 0, 2), c)
+		var t := 0.0
+		while t < (0.18 if shot == "scrambler" else 0.45):
+			await get_tree().process_frame
+			t += get_process_delta_time()
+			if is_instance_valid(c):
+				c.stunned = maxf(c.stunned, 1.0)
+				c.global_position = at # hold still for the photo
+		get_viewport().get_texture().get_image().save_png("%s/%s.png" % [_opts.weaponshow, shot])
+		combat.clear()
+	print("[weaponshow] done")
+	get_tree().quit()
+
+
 # --- autopilot (title screen flyby and automated tests) -----------------------------
 
 ## Flies a wide lazy circle over downtown for the title screen.
@@ -560,12 +614,12 @@ func _autopilot_fight() -> void:
 		return
 	var local := _steer_to(best.global_position + best.velocity * clampf(best_d / 1200.0, 0.0, 1.0))
 	player.ai.throttle = 0.85 if best_d > 300.0 else 0.6
-	player.ai.fire = local.z < -0.97 and best_d < 900.0
+	player.ai.fire = local.z < -0.97 and best_d < 900.0 and not _opts.has("weapons")
 	if _opts.has("god"):
 		player.god_mode = true
 		player.grant_invulnerability(1.0)
 		player.ai.erase("aim")
-		if best_d < 900.0 and local.z < -0.3:
+		if best_d < 900.0 and local.z < -0.3 and not _opts.has("weapons"):
 			var muzzle_t := best_d / (1150.0 + player.speed)
 			player.ai.aim = (best.global_position + best.velocity * muzzle_t - player.global_position).normalized()
 			player.ai.fire = true
@@ -577,8 +631,46 @@ var _six_streak := 0.0
 var _six_max := 0.0
 
 
+var _weapon_test_t := 0.0
+var _weapon_test_i := 0
+
+
+## --weapons: every few seconds, aim at the nearest live target and fire the next special
+## missile at it, then report what happened to it.
+func _weapon_test_step(delta: float) -> void:
+	_weapon_test_t -= delta
+	if _weapon_test_t > 0.0 or state != State.PLAYING or _intro_t > 0.0:
+		return
+	_weapon_test_t = 3.0
+	var best: Target = null
+	var best_d := 900.0
+	for t in combat.targets:
+		var d := t.global_position.distance_to(player.global_position)
+		if t.alive and t.visible and d < best_d and d > 80.0:
+			best = t
+			best_d = d
+	if best == null:
+		return
+	var def: Dictionary = Arsenal.SPECIALS[_weapon_test_i % Arsenal.SPECIALS.size()]
+	_weapon_test_i += 1
+	player.look_at(best.global_position, Vector3.UP)
+	player.special_ammo[def.id] = 9
+	player.lock_target = best
+	player.locked = true
+	var hp_before := best.hp
+	var tname := best.display_name
+	var ref: WeakRef = weakref(best)
+	player._fire_special(def)
+	get_tree().create_timer(2.0).timeout.connect(func():
+		var tgt = ref.get_ref()
+		var state_txt: String = "destroyed" if tgt == null or not tgt.alive else "hp %d->%d stunned=%.1f burning=%.1f captured=%s" % [hp_before, tgt.hp, tgt.stunned, tgt.burn_t, tgt.captured]
+		print("[weapons] %-18s vs %-16s -> %s" % [def.name, tname, state_txt]))
+
+
 func _autotest_step(delta: float) -> void:
 	_test_t += delta / maxf(Engine.time_scale, 0.01)
+	if _opts.has("weapons"):
+		_weapon_test_step(delta)
 	# Dogfight metric: how long an attacker sits behind the player without a break.
 	if state == State.PLAYING and hud._bandit_on_six(player) != null:
 		_six_t += delta

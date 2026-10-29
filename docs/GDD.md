@@ -51,9 +51,20 @@ Source: `scripts/player/turbokat_model.gd` (all colours are constants at the top
 | Hull | 100 HP; repair pickups dropped by enemies |
 | Cameras | Chase / far chase / cockpit (C) |
 
-**Gadget missile roadmap** (one unlocked per episode, inspired by the show's arsenal):
-Octopus (grabs and stuns), Cement (freezes a target in place), Spider (net that clips wings),
-Scrambler (jams turrets), Buzzsaw (cuts through armor). The Mega-Missile ships in v0.1.
+**Missiles (canon, from https://swatkats.info/entry-type/swat-kats-weapons/)**
+
+| Missile | Canon summary | Gameplay |
+|---|---|---|
+| Blowtorch (F) | High-explosive guided missile carried aboard the TurboKat | Lock-on homing missile, regenerates |
+| Octopus | Signature less-than-lethal missile that captures and restrains a target | Restrained gliders fall; turrets pinned for 8 s |
+| Buzz-Saw | Non-explosive spinning saw in a red casing with a shark decal; best against wings; fired as a barrage | One saw per locked target (up to 4); bonus vs gliders |
+| Scrambler | Million-megavolt discharge that disables electrical systems; lightning-bolt marking | Disables everything within 75 m for 6 s |
+| Slicer | Non-explosive bladed missile that penetrates targets | Damages armored targets (the warship hull before its turrets fall) |
+| Match Head | Explosive-incendiary missile with a match-like ball tip that ignites | Large blast that sets targets burning |
+
+Candidates for later episodes: Banshee (sonic, disrupts guidance), Megavolt, Mole (drilling),
+Pincer, Spider (needs a canon description), Decoy (countermeasure once enemies fire homing weapons),
+and the Wet Cement Machine Gun (less-than-lethal cannon).
 
 ## 4. Controls
 

@@ -26,8 +26,8 @@ arcade jet combat, lock-on missiles and big set-piece bosses, playable in a web 
 | Throttle | W / S | RT / LT |
 | Afterburner | Shift | RB |
 | Cannon | Space / Left click | A |
-| Homing missile (lock first) | F / Right click | B |
-| Special missile (Mega-Missile, more to come) | R | X |
+| Blowtorch homing missile (lock first) | F / Right click | B |
+| Fire selected special missile | R | X |
 | Next special missile | Q | LB |
 | Airbrake (tighter turns) | Hold S at idle | Hold LT at idle |
 | Camera (chase / far / cockpit) | C | Y |
@@ -40,7 +40,10 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 - **The TurboKat:** a community 3D model painted in the show's colours (glossy black, red cockpit pod with royal-blue glass, blue wingtips and nose, red engines with spinning turbines). Its wings swing back at high speed and spread open when slow, and it's cel-shaded with cartoon outlines. A procedural fallback airframe is built if the model files are missing.
 - **Launch sequence:** a themed browser loading screen (searchlights, TurboKat flyby, radio chatter, turbine spool-up gauge), then an in-game intro where the salvage-yard hatch opens, the TurboKat rises out and blasts off as the logo slams in.
 - **Arcade flight model:** bank-to-turn, auto-level, afterburner, speed gained in dives and lost in climbs.
-- **Weapons:** twin cannons with overheat, lock-on homing missiles, and the Mega-Missile.
+- **Weapons:** twin cannons with overheat, Blowtorch homing missiles, and a rack of the show's
+  special missiles (from the swatkats.info weapons catalogue): the **Octopus** (captures a target),
+  **Buzz-Saw** (saw barrage, one per locked target), **Scrambler** (shorts out everything nearby),
+  **Slicer** (cuts through armor) and **Match Head** (incendiary blast).
 - **Cartoon effects:** banded toon fireballs that break up into chunky smoke, impact stars,
   shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on
   big kills. All pooled (no per-explosion allocations) to keep the web build smooth.

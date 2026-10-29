@@ -10,11 +10,13 @@ uniform vec4 edge_color : source_color = vec4(1.0, 0.6, 0.15, 1.0);
 varying float v_age;
 varying float v_seed;
 varying float v_int;
+varying float v_tint;
 
 void vertex() {
 	v_age = INSTANCE_CUSTOM.x;
 	v_seed = INSTANCE_CUSTOM.y;
 	v_int = INSTANCE_CUSTOM.z;
+	v_tint = INSTANCE_CUSTOM.w;
 	// Billboard while keeping the instance's scale.
 	float s = length(MODEL_MATRIX[0].xyz);
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0] * s, INV_VIEW_MATRIX[1] * s, INV_VIEW_MATRIX[2] * s, MODEL_MATRIX[3]);
@@ -38,6 +40,10 @@ void fragment() {
 		float width = mix(0.22, 0.03, v_age);
 		alpha = step(abs(r - 0.82), width * 0.5);
 		col = mix(core_color.rgb, edge_color.rgb, v_age);
+	}
+	if (v_tint > 0.5) {
+		// Electric: white-hot core fading to cyan.
+		col = mix(vec3(0.95, 0.98, 1.0), vec3(0.3, 0.75, 1.0), smoothstep(0.0, 0.9, r));
 	}
 	alpha *= (1.0 - v_age) * v_int;
 	if (alpha <= 0.01) {

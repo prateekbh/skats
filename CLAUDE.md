@@ -5,7 +5,8 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
 
 ## Canon reference
 
-- **https://swatkats.info/** is the reference for everything SWAT Kats: characters, villains,
+- **https://swatkats.info/** is the reference for everything SWAT Kats (the weapons catalogue is
+  https://swatkats.info/entry-type/swat-kats-weapons/; missiles are data in `scripts/combat/arsenal.gd`): characters, villains,
   episodes, the TurboKat and its weapons. When adding or changing weapons, missile types, gadgets,
   enemies or story beats, look them up there and match the show (names, behaviour, colours).
   If the site isn't reachable from your environment, ask the user for the relevant page or
@@ -19,8 +20,10 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
 - Run the checks before pushing:
   `godot --headless --path . --import` then `godot --headless --path . -- --autotest --god --seconds=30`.
   CI (`.github/workflows/web.yml`) runs the same smoke test, exports for web and deploys to Pages.
+  `--autotest --god --weapons` fires every special missile at targets and prints the result.
 - Screenshots need a display: `xvfb-run godot --path . --rendering-driver opengl3 -- --showcase=<dir>`
-  (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--snap=<file> [--intro --snap-at=<s>]`
+  (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--weaponshow=<dir>` (missile models
+  and effects), `--snap=<file> [--intro --snap-at=<s>]`
   (title or intro frames).
 - Everything visual is generated in code or by the scripts in `tools/` (re-run them, don't hand-edit
   their outputs): `convert_turbokat.py` (3D model and paint), `prepare_launch_art.py` (launch-screen

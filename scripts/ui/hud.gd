@@ -356,12 +356,28 @@ func _draw_status(p: TurboKat, o: Vector2, ui: float) -> void:
 	_bar(o + Vector2(0, 34 * ui), w, "AFTERBURNER", p.boost / 100.0, Color(0.5, 0.8, 1.0), ui)
 	_bar(o + Vector2(0, 68 * ui), w, "GUN HEAT", p.heat / 100.0, RED if p.overheated else AMBER, ui)
 	var y := o.y + 110 * ui
-	_text(Vector2(o.x, y), "[F] MISSILES  %02d" % p.missiles, 16, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
-	var sp := p.selected_special()
-	var cycle_hint := "  [Q] NEXT" if Arsenal.SPECIALS.size() > 1 else ""
-	_text(Vector2(o.x + w * 0.5, y), "[R] %s  x%d%s" % [str(sp.name).to_upper(), p.special_ammo.get(sp.id, 0), cycle_hint], 13, AMBER, HORIZONTAL_ALIGNMENT_LEFT)
+	_text(Vector2(o.x, y), "[F] BLOWTORCH  %02d" % p.missiles, 16, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
+	_draw_rack(p, Vector2(o.x, o.y - 28 - Arsenal.SPECIALS.size() * 18 * ui - 40 * ui), w, ui)
 	var lock_txt := "LOCKED" if p.locked else ("LOCKING" if p.lock_target else "NO LOCK")
 	_text(Vector2(o.x, y + 24 * ui), lock_txt, 13, RED if p.locked else GREEN_DIM, HORIZONTAL_ALIGNMENT_LEFT)
+
+
+## The special-missile rack: every canon missile with its ammo; the selected one is boxed.
+func _draw_rack(p: TurboKat, o: Vector2, w: float, ui: float) -> void:
+	var row := 18.0 * ui
+	draw_rect(Rect2(o - Vector2(12, 22), Vector2(w + 24, Arsenal.SPECIALS.size() * row + 30)), Color(0.02, 0.05, 0.06, 0.55))
+	_text(o + Vector2(0, -6), "[R] FIRE   [Q] NEXT", 12, GREEN_DIM, HORIZONTAL_ALIGNMENT_LEFT)
+	for k in Arsenal.SPECIALS.size():
+		var def: Dictionary = Arsenal.SPECIALS[k]
+		var y := o.y + 12 + k * row
+		var ammo: int = p.special_ammo.get(def.id, 0)
+		var selected := k == p.special_index
+		var col := AMBER if selected else (GREEN_DIM if ammo > 0 else Color(0.5, 0.5, 0.5, 0.5))
+		if selected:
+			draw_rect(Rect2(Vector2(o.x - 6, y - row + 4), Vector2(w + 12, row)), Color(1.0, 0.78, 0.25, 0.15))
+		draw_rect(Rect2(Vector2(o.x, y - 10), Vector2(8, 8)), def.color)
+		_text(Vector2(o.x + 14, y), str(def.name).to_upper(), 13, col, HORIZONTAL_ALIGNMENT_LEFT)
+		_text(Vector2(o.x + w - 40, y), "x%d" % ammo, 13, col, HORIZONTAL_ALIGNMENT_RIGHT, 40)
 
 
 func _bar(o: Vector2, w: float, label: String, v: float, col: Color, ui: float) -> void:

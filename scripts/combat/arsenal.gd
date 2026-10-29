@@ -1,27 +1,67 @@
 class_name Arsenal
 extends RefCounted
-## The TurboKat's special-missile rack, as data. The player cycles the rack with Q (gamepad LB)
-## and fires the selected missile with R (gamepad X); homing missiles stay on F.
+## The TurboKat's missiles, as data. Homing missiles are on F; the special rack is cycled
+## with Q (gamepad LB) and the selected missile fired with R (gamepad X).
 ##
-## Combat implements these behaviours (add new ones in Combat._missile_hit):
-##   "blast"   big explosion that damages everything within blast_radius
-##   "stun"    disables the target for `stun` seconds (stops firing, drifts and tumbles)
-##   "pierce"  damages even armored targets (e.g. the warship hull before its turrets fall)
+## Every missile here is canon, from the SWAT Kats weapons catalogue at
+## https://swatkats.info/entry-type/swat-kats-weapons/ (see CLAUDE.md). The quoted
+## summaries below are from each entry; the gameplay behaviour is our interpretation.
 ##
-## Names, effects and colours of the show's missiles must come from swatkats.info
-## (see CLAUDE.md). Add an entry here per missile once its canon details are confirmed.
+## Behaviours implemented in Combat._missile_hit / TurboKat._fire_special:
+##   "homing"  guided high explosive
+##   "capture" restrains the target: gliders fall out of the sky, turrets are pinned
+##   "barrage" fires one missile per locked target (up to `volley`), non-explosive saw hits
+##   "scramble" electrical discharge that disables every target within `radius`
+##   "pierce"  damages armored targets too
+##   "blast"   explosion that damages everything within `radius` and sets targets burning
+
+## Blowtorch Missile: "High explosive guided missile carried aboard the Turbokat."
+const HOMING := {
+	"id": "blowtorch", "name": "Blowtorch Missile", "behaviour": "homing", "model": "standard",
+	"damage": 120.0, "color": Color(0.9, 0.9, 0.92), "size": 1.0, "speed": 560.0, "turn": 2.8,
+}
 
 const SPECIALS: Array[Dictionary] = [
 	{
-		"id": "mega", "name": "Mega-Missile", "behaviour": "blast",
-		"ammo": 3, "max": 5,
-		"damage": 450.0, "blast_radius": 90.0, "blast_damage": 220.0,
-		"color": Color(0.95, 0.75, 0.15), "size": 1.8, "speed": 420.0, "turn": 1.8,
+		# "Signature weapon of the SWAT Kats. This less-than lethal missile is used to capture
+		# and restrain a target."
+		"id": "octopus", "name": "Octopus Missile", "behaviour": "capture", "model": "octopus",
+		"blurb": "Captures and restrains a target",
+		"ammo": 3, "max": 4, "damage": 10.0, "hold": 8.0,
+		"color": Color(0.78, 0.2, 0.55), "size": 1.4, "speed": 460.0, "turn": 3.2,
+	},
+	{
+		# "Non-explosive, rocket-propelled projectile that contains a motorized, spinning
+		# saw-blade that expands out of a red casing... most effective when used against
+		# lines, tethers, propellers and wings... the Turbokat can rapidly fire a barrage of
+		# Buzz-Saw Missiles against a multitude of enemy targets."
+		"id": "buzzsaw", "name": "Buzz-Saw Missile", "behaviour": "barrage", "model": "buzzsaw",
+		"blurb": "Saw barrage, one per locked target",
+		"ammo": 3, "max": 5, "volley": 4, "damage": 110.0, "wing_bonus": 1.6,
+		"color": Color(0.85, 0.12, 0.1), "size": 1.0, "speed": 520.0, "turn": 3.0,
+	},
+	{
+		# "Used to disable electrical systems with a discharge of a million megavolts upon
+		# impact... Occasionally... a lightning bolt symbol painted on it."
+		"id": "scrambler", "name": "Scrambler Missile", "behaviour": "scramble", "model": "scrambler",
+		"blurb": "Shorts out everything nearby",
+		"ammo": 2, "max": 3, "damage": 20.0, "radius": 75.0, "disable": 6.0,
+		"color": Color(0.25, 0.35, 0.8), "size": 1.3, "speed": 480.0, "turn": 2.4,
+	},
+	{
+		# "A non-explosive, bladed missile... to penetrate targets in a highly destructive,
+		# yet controlled and isolated, fashion."
+		"id": "slicer", "name": "Slicer Missile", "behaviour": "pierce", "model": "slicer",
+		"blurb": "Cuts through armor",
+		"ammo": 3, "max": 4, "damage": 260.0,
+		"color": Color(0.75, 0.78, 0.85), "size": 1.2, "speed": 540.0, "turn": 2.6,
+	},
+	{
+		# "An explosive-incendiary missile characterized by its match-like ball tip that ignites
+		# after being fired. It is one of the SWAT Kats signature missiles."
+		"id": "matchhead", "name": "Match Head Missile", "behaviour": "blast", "model": "matchhead",
+		"blurb": "Big incendiary blast",
+		"ammo": 2, "max": 3, "damage": 380.0, "radius": 90.0, "radius_damage": 200.0, "burn": 40.0,
+		"color": Color(0.92, 0.88, 0.75), "size": 1.6, "speed": 420.0, "turn": 1.9,
 	},
 ]
-
-## The standard homing missile fired with F.
-const HOMING := {
-	"id": "homing", "name": "Homing Missile", "behaviour": "homing",
-	"damage": 120.0, "color": Color(0.9, 0.9, 0.92), "size": 1.0, "speed": 560.0, "turn": 2.8,
-}

@@ -29,6 +29,7 @@ class Pool:
 	var kind := PackedFloat32Array() # puffs: KIND_*, flashes: intensity
 	var drag := PackedFloat32Array()
 	var lift := PackedFloat32Array()
+	var tint := PackedFloat32Array() # flashes: 0 = fire colours, 1 = electric blue
 
 	func _init(capacity: int, mesh: Mesh, material: Material, parent: Node3D, use_colors := false) -> void:
 		cap = capacity
@@ -42,6 +43,7 @@ class Pool:
 		kind.resize(cap)
 		drag.resize(cap)
 		lift.resize(cap)
+		tint.resize(cap)
 		mm = MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_custom_data = true
@@ -57,7 +59,7 @@ class Pool:
 		parent.add_child(mmi)
 
 	## Adds a particle; when full, the oldest slot (index 0) is recycled.
-	func spawn(p: Vector3, v: Vector3, lifetime: float, s0: float, s1: float, k: float, drag_k := 1.5, lift_k := 0.0) -> void:
+	func spawn(p: Vector3, v: Vector3, lifetime: float, s0: float, s1: float, k: float, drag_k := 1.5, lift_k := 0.0, tint_k := 0.0) -> void:
 		var i := count
 		if count >= cap:
 			i = 0
@@ -73,6 +75,7 @@ class Pool:
 		kind[i] = k
 		drag[i] = drag_k
 		lift[i] = lift_k
+		tint[i] = tint_k
 
 	func step(dt: float) -> void:
 		var i := count - 1
@@ -100,6 +103,7 @@ class Pool:
 			kind[i] = kind[last]
 			drag[i] = drag[last]
 			lift[i] = lift[last]
+			tint[i] = tint[last]
 		count -= 1
 
 	## Uniform-scale instances that grow from size0 to size1 with an ease-out.
@@ -108,7 +112,7 @@ class Pool:
 			var t := age[i] / life[i]
 			var s := lerpf(size0[i], size1[i], 1.0 - pow(1.0 - t, 3.0))
 			mm.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ONE * s), pos[i]))
-			mm.set_instance_custom_data(i, Color(t, seed[i], kind[i], 0.0))
+			mm.set_instance_custom_data(i, Color(t, seed[i], kind[i], tint[i]))
 		mm.visible_instance_count = count
 
 	## Streaks stretched along their velocity (debris and sparks).
@@ -232,6 +236,24 @@ func muzzle(p: Vector3) -> void:
 func trail(p: Vector3, big := false) -> void:
 	var s := (1.6 if big else 1.0) * randf_range(0.8, 1.25)
 	puffs.spawn(p + _rand_dir() * 0.6 * s, _rand_dir() * 2.0, randf_range(0.7, 1.05), 1.0 * s, 3.2 * s, KIND_TRAIL, 2.0, 2.0)
+
+
+## Scrambler discharge: a blue shockwave, electric stars and arcing sparks.
+func electric(p: Vector3, radius: float) -> void:
+	rings.spawn(p, Vector3.ZERO, 0.45, 4.0, radius * 1.15, 1.0, 0.0, 0.0, 1.0)
+	stars.spawn(p, Vector3.ZERO, 0.22, 6.0, 16.0, 1.0, 0.0, 0.0, 1.0)
+	for k in 6:
+		stars.spawn(p + _rand_dir() * radius * randf_range(0.2, 0.7), Vector3.ZERO, randf_range(0.12, 0.3), 2.0, 6.0, 1.0, 0.0, 0.0, 1.0)
+
+
+## A small electric crackle on a disabled target.
+func crackle(p: Vector3) -> void:
+	stars.spawn(p + _rand_dir() * 3.0, Vector3.ZERO, 0.12, 1.0, 3.5, 0.9, 0.0, 0.0, 1.0)
+
+
+## A lick of flame on a burning target.
+func burn(p: Vector3) -> void:
+	puffs.spawn(p + _rand_dir() * 2.0, Vector3.UP * 8.0 + _rand_dir() * 3.0, randf_range(0.35, 0.6), 1.0, 2.6, KIND_FIRE, 2.0, 10.0)
 
 
 ## Ground dust (the hangar launch).
