@@ -40,6 +40,12 @@ var _tier_broken := {}
 var _rubble_mm: MultiMesh
 var _rubble_n := 0
 const RUBBLE_MAX := 400
+## Damaged buildings move into their own MultiMesh: a finely subdivided box whose vertices
+## building.gdshader bends (crater at the hit, a lean away from it, a jagged broken roof). Only
+## hit buildings pay for the extra vertices; each one's original instance is hidden.
+var _dmg_mm: MultiMesh
+var _dmg_slot := {} # cell -> instance in _dmg_mm
+const DAMAGED_MAX := 96
 
 
 func _ready() -> void:
@@ -119,12 +125,27 @@ func damage_at(p: Vector3, power := 1.0) -> Vector3:
 		return Vector3.INF
 	if absf(p.x - _cx[c]) > _hw[c] + 3.0 or absf(p.z - _cz[c]) > _hd[c] + 3.0:
 		return Vector3.INF
-	var inst := _instance[c]
 	var tier := _tier[c]
 	var bh := _block_h[c]
 	var smoke := p
+	# The main block, moved into the deformable MultiMesh on its first hit (if there's room).
+	var bmm := _mm
+	var inst := _instance[c]
+	if not _dmg_slot.has(c) and _dmg_slot.size() < DAMAGED_MAX:
+		var k := _dmg_slot.size()
+		_dmg_slot[c] = k
+		_dmg_mm.set_instance_transform(k, _mm.get_instance_transform(inst))
+		_dmg_mm.set_instance_color(k, _mm.get_instance_color(inst))
+		_dmg_mm.set_instance_custom_data(k, _mm.get_instance_custom_data(inst))
+		_dmg_mm.visible_instance_count = _dmg_slot.size()
+		_mm.set_instance_transform(inst, Transform3D(Basis.from_scale(Vector3.ONE * 0.001), Vector3(_cx[c], -50.0, _cz[c])))
+	if _dmg_slot.has(c):
+		bmm = _dmg_mm
+		inst = _dmg_slot[c]
+	var scorched_mm := bmm
 	var scorched := inst
 	if tier >= 0 and p.y > bh - 4.0:
+		scorched_mm = _mm
 		scorched = tier
 		if not _tier_broken.has(c):
 			# The tier snaps at its base and leans over, sagging into the roof.
@@ -144,22 +165,23 @@ func damage_at(p: Vector3, power := 1.0) -> Vector3:
 		if chunk > 2.0:
 			bh -= chunk
 			_block_h[c] = bh
-			var xf := _mm.get_instance_transform(inst)
+			var xf := bmm.get_instance_transform(inst)
 			var sc := xf.basis.get_scale()
-			_mm.set_instance_transform(inst, Transform3D(Basis.from_scale(Vector3(sc.x, bh, sc.z)), Vector3(xf.origin.x, bh * 0.5, xf.origin.z)))
+			bmm.set_instance_transform(inst, Transform3D(Basis.from_scale(Vector3(sc.x, bh, sc.z)), Vector3(xf.origin.x, bh * 0.5, xf.origin.z)))
 			_height[c] -= chunk
 			if tier >= 0:
 				var txf := _mm.get_instance_transform(tier)
 				txf.origin.y -= chunk
 				_mm.set_instance_transform(tier, txf)
 		_add_rubble(c, bh, 5)
-		var col := _mm.get_instance_color(inst)
-		col.a = 0.0 # broken roof: building.gdshader chars the top floors
-		_mm.set_instance_color(inst, col)
+		var col := bmm.get_instance_color(inst)
+		col.a = 0.0 # broken roof: building.gdshader chars the top floors and breaks the roofline
+		bmm.set_instance_color(inst, col)
 		smoke = Vector3(clampf(p.x, _cx[c] - _hw[c], _cx[c] + _hw[c]), bh, clampf(p.z, _cz[c] - _hd[c], _cz[c] + _hd[c]))
 	var cx := _cx[c]
 	var cz := _cz[c]
-	_mm.set_instance_custom_data(scorched, Color(_seed0[scorched], maxf(smoke.y, 1.0),
+	var seed: float = scorched_mm.get_instance_custom_data(scorched).r
+	scorched_mm.set_instance_custom_data(scorched, Color(seed, maxf(smoke.y, 1.0),
 		clampf((smoke.x - cx) / _hw[c], -1.2, 1.2), clampf((smoke.z - cz) / _hd[c], -1.2, 1.2)))
 	return smoke
 
@@ -189,6 +211,8 @@ func reset_damage() -> void:
 		if _instance[c] >= 0:
 			_block_h[c] = _xf0[_instance[c]].basis.get_scale().y
 	_tier_broken.clear()
+	_dmg_slot.clear()
+	_dmg_mm.visible_instance_count = 0
 	_rubble_n = 0
 	_rubble_mm.visible_instance_count = 0
 
@@ -278,6 +302,25 @@ func _build_buildings() -> void:
 	_xf0 = xforms.duplicate()
 	_seed0 = PackedFloat32Array(seeds)
 	_color0 = colors.duplicate()
+
+	_dmg_mm = MultiMesh.new()
+	_dmg_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_dmg_mm.use_colors = true
+	_dmg_mm.use_custom_data = true
+	var dense := BoxMesh.new()
+	dense.subdivide_width = 8
+	dense.subdivide_depth = 8
+	dense.subdivide_height = 16
+	_dmg_mm.mesh = dense
+	_dmg_mm.instance_count = DAMAGED_MAX
+	_dmg_mm.visible_instance_count = 0
+	var dmi := MultiMeshInstance3D.new()
+	dmi.multimesh = _dmg_mm
+	var dm := bm.duplicate() as ShaderMaterial
+	dm.set_shader_parameter("deform", true)
+	dmi.material_override = dm
+	dmi.custom_aabb = AABB(Vector3(-HALF, -10, -HALF), Vector3(HALF * 2.0, 600, HALF * 2.0))
+	add_child(dmi)
 
 	_rubble_mm = MultiMesh.new()
 	_rubble_mm.transform_format = MultiMesh.TRANSFORM_3D

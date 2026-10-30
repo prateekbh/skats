@@ -53,8 +53,9 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
   across it like a carousel. The launch intro plays over the theme music only.
 - **Cutting kills and city damage:** a Slicer kill slices a Creepling into five pieces and a
   Buzz-Saw kill saws it in two, with no explosion: the pieces tumble away with glowing cut
-  edges, electric sparks and smoke. Missiles that hit buildings knock roofs down (with rubble),
-  topple tower tiers or blast burning holes in walls, and leave thick black smoke columns that
+  edges, electric sparks and smoke. Missiles that hit buildings bend them out of shape (a crater
+  punched in at the hit, the tower leaning away, a jagged broken roofline), knock roofs down
+  with rubble, topple tower tiers and leave burning holes, and leave thick black smoke columns that
   keep rising until the stage ends, so the damage to Megakat City stays visible.
 - **Cartoon effects:** banded toon fireballs that break up into chunky smoke, impact stars,
   shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on

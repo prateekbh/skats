@@ -64,9 +64,10 @@ Source: `scripts/player/turbokat_model.gd` (all colours are constants at the top
 
 Cut pieces are pooled rigs drawn with `shaders/cut_piece.gdshader` (each piece shows one slab of
 the model between two cut planes; the open cut glows and cools) and trail sparks, electric
-crackle and smoke. Missile hits on buildings deform them (`City.damage_at`: roof knocked down
-with rubble, tower tier snapped and leaning, or a burning hole in the wall, scorched by
-`building.gdshader`) and start a persistent black smoke column (`VFX.add_smoke_column`). The damage
+crackle and smoke. Missile hits on buildings deform them (`City.damage_at`: a hit building moves
+into a small MultiMesh of subdivided boxes that `building.gdshader` bends into a crater, a lean
+and a jagged roofline; roofs are knocked down with rubble, tower tiers snap and lean, and walls
+are scorched with burning holes) and start a persistent black smoke column (`VFX.add_smoke_column`). The damage
 lasts until the next stage starts (`City.reset_damage`).
 
 Firing a special shows a comic title card and (unless turned off in the pause menu) a ~1 s

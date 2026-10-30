@@ -640,10 +640,10 @@ func _weapon_showcase() -> void:
 	combat._missile_hit(Arsenal.SPECIALS[4], bc + Vector3(-10, bh, -6), null)
 	combat._missile_hit(Arsenal.HOMING, bc + Vector3(city._hw[c0], bh * 0.25, 4), null)
 	print("[weaponshow] building h=%.0f -> %.0f" % [bh, city._block_h[c0]])
-	camera.global_position = bc + Vector3(95, bh + 25, 75)
-	camera.look_at(bc + Vector3(0, bh * 0.45, 0), Vector3.UP)
+	camera.global_position = bc + Vector3(120, bh * 0.5, 60)
+	camera.look_at(bc + Vector3(0, bh * 0.4, 0), Vector3.UP)
 	var bt := 0.0
-	while bt < 0.8:
+	while bt < 3.0:
 		await get_tree().process_frame
 		bt += get_process_delta_time()
 	get_viewport().get_texture().get_image().save_png("%s/building_close.png" % _opts.weaponshow)
