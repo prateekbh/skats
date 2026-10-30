@@ -3,14 +3,14 @@
 
 Composition follows the show's hangar frame in tools/launch_src/hangar_ref.png (used only as a
 layout reference): the left wall with a red blast door, the dark corridor with ceiling robot arms,
-the landing circle, stairs, a strapped crate of missiles and a tyre in the foreground. The
+the landing circle and stairs up to a landing. The
 TurboKat itself is not drawn here; the game renders our own 3D model onto the pad.
 
 Coordinates are the reference frame's (640x480) mapped to a 16:9 canvas at 3x, with extra wall
 at both sides so it also fills wide screens.
 
 Usage:  python3 tools/prepare_hangar_art.py   (needs Node + Playwright's Chromium, Godot, xvfb-run)
-Writes: web/launch/hangar.svg (layers: back, floor, arms, fore), web/launch/hangar.jpg (the
+Writes: web/launch/hangar.svg (layers: back, floor, stairs, props, grime, light, arms), web/launch/hangar.jpg (the
         backdrop), web/launch/turbokat_hangar.png (our TurboKat rendered by the game with
         `--hangarjet`, placed on the pad, same canvas size) and web/launch/hangar_preview.jpg
 """
@@ -110,12 +110,6 @@ def defs() -> str:
   </linearGradient>
   <linearGradient id="back" x1="0" y1="{Y(120)}" x2="0" y2="{Y(250)}" gradientUnits="userSpaceOnUse">
     <stop offset="0" stop-color="#0e171b"/><stop offset="1" stop-color="#22393c"/>
-  </linearGradient>
-  <linearGradient id="missile" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#2a2840"/><stop offset="0.3" stop-color="#8a87b8"/><stop offset="0.55" stop-color="#3a3858"/><stop offset="1" stop-color="#151422"/>
-  </linearGradient>
-  <linearGradient id="nose" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#e2463a"/><stop offset="0.5" stop-color="{RED}"/><stop offset="1" stop-color="{RED_DARK}"/>
   </linearGradient>
   <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#d8f0e8" stop-opacity="0.55"/><stop offset="1" stop-color="#d8f0e8" stop-opacity="0"/>
@@ -371,62 +365,6 @@ def arms() -> str:
     return "\n".join(o)
 
 
-def missile_crate() -> str:
-    """A strapped bundle of red-tipped missiles in the left foreground."""
-    # Drawn at the reference's foreground size, then set back beside the left wall at half size.
-    k = 0.5
-    tx, ty = X(96) - X(40) * k, Y(374) - Y(484) * k
-    o = [f'<g id="crate" transform="translate({tx:.1f} {ty:.1f}) scale({k})">']
-    o.append(f'<ellipse cx="{X(300)}" cy="{Y(484)}" rx="{280 * S}" ry="{14 * S}" fill="#0d1414" opacity="0.5"/>')
-    rows = [(360, 4), (388, 5), (418, 5), (450, 5)]
-    for (y, n) in rows:
-        pass
-    # Missiles: back row first, rows overlapping so the bundle reads as round and heavy.
-    layout = [(356, 150, 470), (372, 120, 478), (396, 96, 486), (424, 84, 492), (454, 78, 496)]
-    for (y, x0, x1) in layout:
-        r = 16
-        # Fins at the tail.
-        o.append(poly([(x0 + 14, y - r + 2), (x0 - 34, y - r - 10), (x0 - 38, y - r + 3), (x0 + 8, y - 3)], RED, width=3))
-        o.append(poly([(x0 + 14, y + r - 2), (x0 - 34, y + r + 8), (x0 - 38, y + r - 4), (x0 + 8, y + 3)], RED_DARK, width=3))
-        # Body.
-        o.append(f'<rect x="{X(x0)}" y="{Y(y - r)}" width="{(x1 - x0) * S}" height="{2 * r * S}" rx="{r * S * 0.35}" fill="url(#missile)" stroke="{INK}" stroke-width="5"/>')
-        o.append(line((x0 + 14, y - r * 0.42), (x1 - 10, y - r * 0.42), "#c4c1ec", 5, 'opacity="0.55"'))
-        # Nose cone.
-        o.append(path([("M", x1, y - r), ("Q", x1 + 44, y - r * 0.7, x1 + 58, y + 1), ("Q", x1 + 44, y + r * 0.75, x1, y + r), ("Z",)], fill="url(#nose)", width=5))
-        o.append(path([("M", x1 + 6, y - r * 0.6), ("Q", x1 + 32, y - r * 0.5, x1 + 46, y - 3)], stroke="#f39a8c", width=4))
-        o.append(line((x1, y - r + 2), (x1, y + r - 2), INK, 5))
-    # The crate frame: a top rail with a lid plate and two straps wrapping the bundle.
-    o.append(poly([(150, 334), (430, 326), (440, 344), (158, 352)], "#3a3c55", width=5))
-    for k in range(5):
-        o.append(f'<rect x="{X(186 + k * 46)}" y="{Y(331 - k * 1.2)}" width="{24 * S}" height="{7 * S}" fill="#2a2c42" stroke="{INK}" stroke-width="3"/>')
-    for xs in (150, 316):
-        o.append(poly([(xs, 340), (xs + 26, 338), (xs + 30, 484), (xs + 4, 484)], "#2c2e45", width=5))
-        o.append(line((xs + 9, 348), (xs + 13, 482), "#5f6286", 3.5))
-        for yy in range(352, 480, 16):
-            o.append(f'<circle cx="{X(xs + 20)}" cy="{Y(yy)}" r="4" fill="#7b7ea6"/>')
-    o.append("</g>")
-    return "\n".join(o)
-
-
-def tyre() -> str:
-    cx, cy = 640, 400
-    k = 0.42
-    tx, ty = X(668) - X(cx) * k, Y(318) - Y(cy) * k
-    o = [f'<g id="tyre" transform="translate({tx:.1f} {ty:.1f}) scale({k})">']
-    o.append(f'<ellipse cx="{X(cx + 10)}" cy="{Y(cy + 86)}" rx="{70 * S}" ry="{10 * S}" fill="#0d1414" opacity="0.5"/>')
-    o.append(f'<ellipse cx="{X(cx + 16)}" cy="{Y(cy)}" rx="{56 * S}" ry="{88 * S}" fill="#15171b" stroke="{INK}" stroke-width="4"/>')
-    o.append(f'<ellipse cx="{X(cx)}" cy="{Y(cy)}" rx="{56 * S}" ry="{88 * S}" fill="#24272d" stroke="{INK}" stroke-width="4"/>')
-    for k in range(10):
-        a = k / 10 * math.tau
-        o.append(line((cx + math.cos(a) * 50, cy + math.sin(a) * 79), (cx + math.cos(a) * 56, cy + math.sin(a) * 88), "#3a3e46", 4))
-    o.append(f'<ellipse cx="{X(cx)}" cy="{Y(cy)}" rx="{34 * S}" ry="{54 * S}" fill="#2e3238" stroke="{INK}" stroke-width="4"/>')
-    o.append(f'<ellipse cx="{X(cx)}" cy="{Y(cy)}" rx="{22 * S}" ry="{36 * S}" fill="#6f6d4a" stroke="{INK}" stroke-width="3"/>')
-    o.append(f'<ellipse cx="{X(cx - 3)}" cy="{Y(cy - 4)}" rx="{11 * S}" ry="{18 * S}" fill="#c9c27a" stroke="{INK}" stroke-width="3"/>')
-    o.append(path([("M", cx - 30, cy - 60), ("Q", cx - 52, cy, cx - 30, cy + 60)], stroke="#4a4f58", width=4))
-    o.append("</g>")
-    return "\n".join(o)
-
-
 def grime() -> str:
     """Speckle and stains over walls and floor, plus a vignette."""
     return f"""
@@ -506,7 +444,6 @@ def build_svg() -> str:
         ('grime', grime()),
         ('light', lighting()),
         ('arms', arms()),
-        ('fore', missile_crate() + tyre()),
     ]
     body = "\n".join(f'<g id="{name}">\n{svg}\n</g>' for name, svg in layers)
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">{defs()}\n{body}\n</svg>\n'
@@ -558,8 +495,6 @@ def main() -> None:
     svg_path.write_text(build_svg())
     render(svg_path, OUT / "hangar.jpg")
     render_jet(OUT / "turbokat_hangar.png")
-    # Preview of the layers together: backdrop, jet, then the foreground drawn again on top
-    # would need a separate pass; the jet sits behind nothing in the foreground at this layout.
     preview = Image.open(OUT / "hangar.jpg").convert("RGBA")
     preview.alpha_composite(Image.open(OUT / "turbokat_hangar.png"))
     preview.convert("RGB").save(OUT / "hangar_preview.jpg", quality=88)
