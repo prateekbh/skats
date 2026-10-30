@@ -1,5 +1,6 @@
 # Builds the Web export with headless Godot and publishes it to GitHub Pages.
-# Enable Pages in the repo settings with "Source: GitHub Actions".
+# Enable Pages in the repo settings with "Source: GitHub Actions" (until then the deploy job waits
+# out GitHub's branch deploy so the game, not the README, ends up live).
 name: Web build
 
 on:
@@ -11,6 +12,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 env:
   GODOT_VERSION: 4.7.1
@@ -60,5 +62,23 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # While the repo's Pages source is still "Deploy from a branch", GitHub's own
+      # "pages build and deployment" run also publishes on every push and puts the README up.
+      # Wait for it to finish so the game is always the deploy that lands last.
+      - name: Wait for GitHub's branch deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 60); do
+            runs=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=${{ github.sha }}&per_page=30" \
+              --jq '[.workflow_runs[] | select(.name == "pages build and deployment")]')
+            total=$(echo "$runs" | jq 'length')
+            pending=$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')
+            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then echo "Branch deploy finished"; break; fi
+            # No branch deploy at all after a minute: Pages already uses GitHub Actions.
+            if [ "$total" -eq 0 ] && [ "$i" -ge 6 ]; then echo "No branch deploy"; break; fi
+            sleep 10
+          done
+
       - id: deployment
         uses: actions/deploy-pages@v4
