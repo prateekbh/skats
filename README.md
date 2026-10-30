@@ -46,8 +46,11 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
   **Slicer** (cuts through armor) and **Match Head** (incendiary blast). Each one flies its own
   way with its own trail (Octopus swims on a pink ink wave, Buzz-Saw corkscrews in sparks,
   Scrambler zigzags like lightning, Slicer streaks like a laser, Match Head lobs a fiery arc),
-  and firing one plays a short missile cam: a comic title card and a slow-motion chase shot that
-  holds on the impact. Skip it with any fire button, or turn it off in the pause menu.
+  and firing one plays a short launch shot: a comic title card and a slow-motion beat beside the
+  jet as the missile leaves the rack. Skip it with any fire button, or turn it off in the pause
+  menu. The selected missile shows as a card with its picture from the show (from the
+  swatkats.info missile catalogue) on a cockpit weapons screen; cycling with Q slides the cards
+  across it like a carousel. The launch intro plays over the theme music only.
 - **Cartoon effects:** banded toon fireballs that break up into chunky smoke, impact stars,
   shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on
   big kills. All pooled (no per-explosion allocations) to keep the web build smooth.

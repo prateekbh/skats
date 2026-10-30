@@ -182,12 +182,12 @@ func hit_stop(real_seconds: float) -> void:
 
 # --- missile cam ----------------------------------------------------------------------
 
-## Cinematic for special missiles: a chase camera on the missile with a title card. The launch
-## plays in slow motion, the flight ramps back to full speed so the missile reaches its target,
-## and the impact gets a slow beat before returning to the cockpit. Skippable with any fire button.
+## Launch shot for special missiles: a title card and a short slow-motion beat from beside the
+## TurboKat's nose as the missile leaves the rack, then straight back to the game. The camera is
+## locked to the jet and kept level (no chasing the missile, which got nauseating).
+## Skippable with any fire button.
 const MCAM_SLOWMO := 0.3
-const MCAM_MAX := 3.4 # unscaled seconds
-const MCAM_LAG := 55.0 # furthest the camera falls behind a fast missile
+const MCAM_TIME := 1.1 # unscaled seconds
 var _mcam := {}
 
 
@@ -195,7 +195,7 @@ func _on_special_fired(missiles: Array, def: Dictionary) -> void:
 	hud.banner(def)
 	if not Game.missile_cam or (_autotest and not _opts.has("mcam")) or not _mcam.is_empty() or missiles.is_empty():
 		return
-	_mcam = {"m": missiles[0], "t": 0.0, "impact": -1.0, "last": player.global_position}
+	_mcam = {"t": 0.0}
 	camera.shot = "script"
 	Engine.time_scale = MCAM_SLOWMO
 	player.grant_invulnerability(1.0)
@@ -204,38 +204,15 @@ func _on_special_fired(missiles: Array, def: Dictionary) -> void:
 func _missile_cam_step(real_dt: float) -> void:
 	_mcam.t = float(_mcam.t) + real_dt
 	var elapsed: float = _mcam.t
-	var m: Dictionary = _mcam.m
-	var flying: bool = combat._missiles.has(m)
 	var skip := elapsed > 0.3 and (Input.is_action_just_pressed("fire_guns") or Input.is_action_just_pressed("fire_special") or Input.is_action_just_pressed("fire_missile"))
-	if flying:
-		# Aim at the missile's guide point (its smooth course) rather than the body, so the frame
-		# stays steady and the spiral / zigzag / wave plays out on screen.
-		var node: Node3D = m.node
-		# The lobbed arc leaves the guide point far below, so that one is framed on the body.
-		var base: Vector3 = node.global_position if m.def.get("path", "") == "arc" else m.base
-		var d: Vector3 = _mcam.get("dir", m.dir)
-		d = d.slerp(m.dir, 1.0 - exp(-real_dt * 5.0)).normalized()
-		_mcam.dir = d
-		var side := d.cross(Vector3.UP)
-		side = side.normalized() if side.length_squared() > 0.001 else Vector3.RIGHT
-		# The camera trails behind on a soft spring, so fast missiles visibly pull away from it
-		# (the Slicer streaks off, the Match Head lumbers), capped so the missile stays in shot.
-		var want := base - d * 9.0 + side * 8.0 + Vector3.UP * 4.0 # clear of the trail
-		var pos := want if elapsed < 0.05 else camera.global_position.lerp(want, 1.0 - exp(-real_dt * 3.0))
-		if pos.distance_to(want) > MCAM_LAG:
-			pos = want + (pos - want).normalized() * MCAM_LAG
-		camera.global_position = pos
-		camera.look_at(base + d * 4.0, Vector3.UP)
-		_mcam.last = node.global_position
-		Engine.time_scale = lerpf(MCAM_SLOWMO, 1.0, smoothstep(0.6, 1.5, elapsed))
-	else:
-		# Impact: hold on the blast for a beat.
-		if float(_mcam.impact) < 0.0:
-			_mcam.impact = elapsed
-			Engine.time_scale = MCAM_SLOWMO
-		camera.look_at(_mcam.last, Vector3.UP)
-	var impact_hold: bool = float(_mcam.impact) >= 0.0 and elapsed - float(_mcam.impact) > 0.8
-	if skip or impact_hold or elapsed > MCAM_MAX or not player.alive:
+	var tb := player.global_transform.basis
+	var fwd := -tb.z
+	var right := tb.x
+	# Low off the right wing and behind the tail, looking down the flight line: the jet sits on
+	# the left of the frame and the missile streaks away from it into the distance.
+	camera.global_position = player.global_position - fwd * 24.0 + right * 15.0 + Vector3.UP * 3.0
+	camera.look_at(player.global_position + fwd * 70.0, Vector3.UP)
+	if skip or elapsed > MCAM_TIME or not player.alive:
 		_end_missile_cam()
 
 
@@ -498,7 +475,6 @@ func _intro_step(delta: float) -> void:
 	var yard := city.salvage_yard_pos
 	var hatch := yard + Vector3(0, 1.5, 0)
 	var flat := Vector3(-yard.x, 0, -yard.z).normalized() # toward downtown
-	_intro_once("alarm", 0.3, func(): Sfx.play("alarm", -10.0))
 	city.set_hatch(smoothstep(0.5, 1.4, t))
 
 	# Distance travelled along the launch path, measured from the hatch (negative = still in the tunnel).
@@ -520,9 +496,8 @@ func _intro_step(delta: float) -> void:
 	player.throttle = 1.0
 	player.boosting = true
 
+	# No launch sound effects: the intro plays over the theme music alone.
 	_intro_once("launch", INTRO_EMERGE - 0.05, func():
-		Sfx.play("missile", 4.0, 0.55)
-		Sfx.play("boom", 0.0, 0.6)
 		camera.add_shake(1.8)
 		combat.vfx.dust(hatch, 1.4))
 	_intro_once("logo", INTRO_EMERGE + 2.4, menu.slam_logo)
@@ -538,7 +513,6 @@ func _intro_step(delta: float) -> void:
 	camera.look_at(target, Vector3.UP)
 
 	player._effects(delta)
-	Sfx.set_engine(true, player.throttle, 1.0)
 	if t > INTRO_EMERGE + 6.0:
 		_finish_intro()
 
@@ -730,7 +704,8 @@ func _weapon_test_step(delta: float) -> void:
 	var def: Dictionary = Arsenal.SPECIALS[_weapon_test_i % Arsenal.SPECIALS.size()]
 	_weapon_test_i += 1
 	player.look_at(best.global_position, Vector3.UP)
-	player.special_ammo[def.id] = 9
+	player.special_ammo[def.id] = def.max
+	player.special_index = Arsenal.SPECIALS.find(def)
 	player.lock_target = best
 	player.locked = true
 	var hp_before := best.hp
@@ -739,7 +714,7 @@ func _weapon_test_step(delta: float) -> void:
 	player._fire_special(def)
 	if _opts.has("shots"):
 		# Photograph the missile cam mid-flight.
-		for at in [0.15, 0.6, 1.2]:
+		for at in [0.02, 0.18, 0.3]:
 			get_tree().create_timer(at).timeout.connect(func():
 				var img := get_viewport().get_texture().get_image()
 				if img:

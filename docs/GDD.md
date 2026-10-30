@@ -62,9 +62,11 @@ Source: `scripts/player/turbokat_model.gd` (all colours are constants at the top
 | Slicer | Non-explosive bladed missile that penetrates targets | Damages armored targets (the warship hull before its turrets fall) | Very fast and dead straight, laser beam |
 | Match Head | Explosive-incendiary missile with a match-like ball tip that ignites | Large blast that sets targets burning | Lobbed arc, fire |
 
-Firing a special shows a comic title card and (unless turned off in the pause menu) a missile cam:
-the launch in slow motion, the flight ramping back to full speed with the camera trailing on a
-spring so fast missiles visibly pull away, and a slow beat on the impact. Skippable with any fire button.
+Firing a special shows a comic title card and (unless turned off in the pause menu) a ~1 s
+slow-motion launch shot from beside the jet, then straight back to play; the camera never chases
+the missile (that tested as nauseating). Skippable with any fire button. The HUD shows only the
+selected special, as a card with the missile's picture from the show on a flat cockpit weapons
+screen; cycling slides the cards across it like a carousel.
 
 Candidates for later episodes: Banshee (sonic, disrupts guidance), Megavolt, Mole (drilling),
 Pincer, Spider (needs a canon description), Decoy (countermeasure once enemies fire homing weapons),

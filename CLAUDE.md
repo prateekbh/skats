@@ -21,7 +21,7 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   `godot --headless --path . --import` then `godot --headless --path . -- --autotest --god --seconds=30`.
   CI (`.github/workflows/web.yml`) runs the same smoke test, exports for web and deploys to Pages.
   `--autotest --god --weapons` fires every special missile at targets and prints the result
-  (the missile cam is skipped in autotests; add `--mcam` to include it, and `--shots=<dir>` under
+  (the missile launch shot is skipped in autotests; add `--mcam` to include it, and `--shots=<dir>` under
   xvfb to photograph it).
 - Screenshots need a display: `xvfb-run godot --path . --rendering-driver opengl3 -- --showcase=<dir>`
   (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--weaponshow=<dir>` (missile models
@@ -29,7 +29,8 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   (title or intro frames).
 - Everything visual is generated in code or by the scripts in `tools/` (re-run them, don't hand-edit
   their outputs): `convert_turbokat.py` (3D model and paint), `prepare_launch_art.py` (launch-screen
-  cut-outs, portraits and the traced logo).
+  cut-outs, portraits and the traced logo), `fetch_missile_art.py` (HUD missile cards from the
+  swatkats.info missile catalogue).
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
   created per shot or per explosion. Effects go through the pooled `VFX` system
   (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.

@@ -22,10 +22,18 @@ var _radio_t := 0.0
 var _center_t := 0.0
 var _damage := 0.0
 var _banner: Control
+var _rack_art := {}
+var _rack_pos := 0.0 # carousel rotation, in cards (unwrapped)
+var _rack_target := 0
+var _rack_index := 0
 
 
 func _ready() -> void:
 	add_to_group("hud")
+	for def in Arsenal.SPECIALS:
+		var path := "res://assets/ui/missiles/%s.jpg" % def.id
+		if ResourceLoader.exists(path):
+			_rack_art[def.id] = load(path)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	font = ThemeDB.fallback_font
@@ -86,6 +94,9 @@ func reset() -> void:
 	_radio_box.visible = false
 	_center.text = ""
 	_damage = 0.0
+	_rack_index = 0
+	_rack_target = 0
+	_rack_pos = 0.0
 
 
 func radio(who: String, text: String, seconds: float) -> void:
@@ -158,6 +169,17 @@ func _process(delta: float) -> void:
 	_center_t -= delta
 	_center.modulate.a = clampf(_center_t * 2.0, 0.0, 1.0)
 	_damage = maxf(0.0, _damage - delta * 2.0)
+	if main and main.player:
+		# Slide the carousel forward to the selected missile, in real time.
+		var n := Arsenal.SPECIALS.size()
+		var idx: int = main.player.special_index
+		if idx != _rack_index:
+			_rack_target += posmod(idx - _rack_index, n)
+			_rack_index = idx
+		var real_dt := delta / maxf(Engine.time_scale, 0.01)
+		_rack_pos = lerpf(_rack_pos, float(_rack_target), 1.0 - exp(-real_dt * 9.0))
+		if absf(_rack_pos - _rack_target) < 0.002:
+			_rack_pos = float(_rack_target)
 	if main and main.mission:
 		_objective.text = main.mission.objective()
 		_score.text = "SCORE %06d" % main.combat.stats.score
@@ -397,27 +419,88 @@ func _draw_status(p: TurboKat, o: Vector2, ui: float) -> void:
 	_bar(o + Vector2(0, 68 * ui), w, "GUN HEAT", p.heat / 100.0, RED if p.overheated else AMBER, ui)
 	var y := o.y + 110 * ui
 	_text(Vector2(o.x, y), "[F] BLOWTORCH  %02d" % p.missiles, 16, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
-	_draw_rack(p, Vector2(o.x, o.y - 28 - Arsenal.SPECIALS.size() * 18 * ui - 40 * ui), w, ui)
+	_draw_rack(p, Vector2(o.x, o.y - 50 * ui), w, ui)
 	var lock_txt := "LOCKED" if p.locked else ("LOCKING" if p.lock_target else "NO LOCK")
 	_text(Vector2(o.x, y + 24 * ui), lock_txt, 13, RED if p.locked else GREEN_DIM, HORIZONTAL_ALIGNMENT_LEFT)
 
 
-## The special-missile rack: every canon missile with its ammo; the selected one is boxed.
+## The special-missile rack as a cockpit weapons screen: a flat MFD showing one card for the
+## selected missile (its picture from the show, via tools/fetch_missile_art.py), name and ammo.
+## Cycling (Q) slides the cards sideways across the screen like a carousel.
 func _draw_rack(p: TurboKat, o: Vector2, w: float, ui: float) -> void:
-	var row := 18.0 * ui
-	draw_rect(Rect2(o - Vector2(12, 22), Vector2(w + 24, Arsenal.SPECIALS.size() * row + 30)), Color(0.02, 0.05, 0.06, 0.55))
-	_text(o + Vector2(0, -6), "[R] FIRE   [Q] NEXT", 12, GREEN_DIM, HORIZONTAL_ALIGNMENT_LEFT)
-	for k in Arsenal.SPECIALS.size():
-		var def: Dictionary = Arsenal.SPECIALS[k]
-		var y := o.y + 12 + k * row
-		var ammo: int = p.special_ammo.get(def.id, 0)
-		var selected := k == p.special_index
-		var col := AMBER if selected else (GREEN_DIM if ammo > 0 else Color(0.5, 0.5, 0.5, 0.5))
-		if selected:
-			draw_rect(Rect2(Vector2(o.x - 6, y - row + 4), Vector2(w + 12, row)), Color(1.0, 0.78, 0.25, 0.15))
-		draw_rect(Rect2(Vector2(o.x, y - 10), Vector2(8, 8)), def.color)
-		_text(Vector2(o.x + 14, y), str(def.name).to_upper(), 13, col, HORIZONTAL_ALIGNMENT_LEFT)
-		_text(Vector2(o.x + w - 40, y), "x%d" % ammo, 13, col, HORIZONTAL_ALIGNMENT_RIGHT, 40)
+	var n := Arsenal.SPECIALS.size()
+	var bez := 8.0 * ui
+	var head_h := 18.0 * ui
+	var img_h := (w - bez * 2.0) * 0.625
+	var plate_h := 30.0 * ui
+	var screen := Rect2(o.x + bez, o.y - plate_h - img_h - bez, w - bez * 2.0, img_h + plate_h)
+	var frame := Rect2(screen.position - Vector2(bez, bez + head_h), screen.size + Vector2(bez * 2.0, bez * 2.0 + head_h))
+	# Bezel and header strip.
+	draw_rect(Rect2(frame.position + Vector2(4, 4) * ui, frame.size), Color(0, 0, 0, 0.5))
+	draw_rect(frame, Color(0.09, 0.1, 0.12, 0.95))
+	draw_rect(frame, Color(0.32, 0.34, 0.38), false, 2.0 * ui)
+	var hy := frame.position.y + head_h * 0.5 + bez * 0.5 + 5 * ui
+	_text(Vector2(screen.position.x, hy), "WPN SEL  [Q]", 12, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
+	_text(Vector2(screen.end.x - 120, hy), "[R] FIRE", 12, GREEN, HORIZONTAL_ALIGNMENT_RIGHT, 120)
+	draw_rect(screen, Color(0.01, 0.02, 0.02))
+	# Cards either side of the current slide position, clipped to the screen.
+	var j0 := floori(_rack_pos)
+	for j in [j0, j0 + 1]:
+		var off := float(j) - _rack_pos # -1..1 card widths
+		if absf(off) >= 1.0:
+			continue
+		_draw_rack_card(p, Arsenal.SPECIALS[posmod(j, n)], screen, img_h, off, ui)
+	# Scanlines and a glass sheen sell the screen.
+	var y := screen.position.y
+	while y < screen.end.y:
+		draw_line(Vector2(screen.position.x, y), Vector2(screen.end.x, y), Color(0, 0, 0, 0.18), 1.0)
+		y += 3.0 * ui
+	draw_rect(Rect2(screen.position, Vector2(screen.size.x, screen.size.y * 0.35)), Color(1, 1, 1, 0.04))
+	draw_rect(screen, Color(0.62, 1.0, 0.72, 0.5), false, 1.0)
+	# Position in the rack.
+	for k in n:
+		var dot := Vector2(screen.get_center().x + (k - (n - 1) * 0.5) * 12 * ui, frame.end.y + 9 * ui)
+		draw_circle(dot, (3.5 if k == p.special_index else 2.2) * ui, AMBER if k == p.special_index else GREEN_DIM)
+
+
+func _draw_rack_card(p: TurboKat, def: Dictionary, screen: Rect2, img_h: float, off: float, ui: float) -> void:
+	var sw := screen.size.x
+	var x0 := screen.position.x + off * sw
+	var vis_l := maxf(x0, screen.position.x)
+	var vis_r := minf(x0 + sw, screen.end.x)
+	if vis_r - vis_l < 1.0:
+		return
+	var u0 := (vis_l - x0) / sw
+	var u1 := (vis_r - x0) / sw
+	var ammo: int = p.special_ammo.get(def.id, 0)
+	var tex: Texture2D = _rack_art.get(def.id)
+	var tint := Color.WHITE if ammo > 0 else Color(0.4, 0.4, 0.45)
+	var img := Rect2(vis_l, screen.position.y, vis_r - vis_l, img_h)
+	if tex:
+		var ts := tex.get_size()
+		draw_texture_rect_region(tex, img, Rect2(u0 * ts.x, 0, (u1 - u0) * ts.x, ts.y), tint)
+	else:
+		draw_rect(img, def.color * tint)
+	var col: Color = def.color
+	var plate := Rect2(vis_l, screen.position.y + img_h, vis_r - vis_l, screen.size.y - img_h)
+	draw_rect(plate, col.darkened(0.45))
+	draw_line(Vector2(vis_l, plate.position.y), Vector2(vis_r, plate.position.y), col.lightened(0.2), 2.0 * ui)
+	if absf(off) > 0.02:
+		return # labels once the card has settled
+	var name_size := int(17 * ui)
+	var name_pos := Vector2(x0 + 8 * ui, plate.position.y + plate.size.y * 0.5 + name_size * 0.36)
+	draw_string_outline(font, name_pos, str(def.name).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, name_size, int(5 * ui), Color.BLACK)
+	draw_string(font, name_pos, str(def.name).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, name_size, Color(1.0, 0.95, 0.75))
+	# Ammo pips down the right of the picture.
+	var mx: int = def.get("max", ammo)
+	for i in mx:
+		var pip := Vector2(x0 + sw - 11 * ui, screen.position.y + (11 + i * 14) * ui)
+		draw_circle(pip, 5.5 * ui, Color.BLACK)
+		draw_circle(pip, 4.0 * ui, Color(1.0, 0.85, 0.3) if i < ammo else Color(0.25, 0.25, 0.28))
+	if ammo <= 0:
+		var stamp_pos := Vector2(x0, screen.position.y + img_h * 0.5 + 10 * ui)
+		draw_string_outline(font, stamp_pos, "EMPTY", HORIZONTAL_ALIGNMENT_CENTER, sw, int(28 * ui), int(8 * ui), Color.BLACK)
+		draw_string(font, stamp_pos, "EMPTY", HORIZONTAL_ALIGNMENT_CENTER, sw, int(28 * ui), RED)
 
 
 func _bar(o: Vector2, w: float, label: String, v: float, col: Color, ui: float) -> void:

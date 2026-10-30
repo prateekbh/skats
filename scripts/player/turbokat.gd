@@ -253,10 +253,7 @@ func _weapons(dt: float) -> void:
 		combat.fire_missile(pos, forward(), speed, lock_target if locked else null)
 	if player_control and Input.is_action_just_pressed("cycle_special") and Arsenal.SPECIALS.size() > 1:
 		special_index = (special_index + 1) % Arsenal.SPECIALS.size()
-		Sfx.play("beep", -8.0, 0.8)
-		var hud = get_tree().get_first_node_in_group("hud")
-		if hud:
-			hud.message("%s: %s" % [str(selected_special().name).to_upper(), selected_special().blurb], 1.6)
+		Sfx.play("beep", -8.0, 0.8) # the HUD carousel turns to the new card
 	var special := selected_special()
 	if player_control and Input.is_action_just_pressed("fire_special") and special_ammo.get(special.id, 0) > 0 and _missile_cd <= 0.0:
 		special_ammo[special.id] -= 1
