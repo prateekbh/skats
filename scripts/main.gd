@@ -477,6 +477,7 @@ func _hangar_jet() -> void:
 			n.light_energy = 1.5
 			n.rotation_degrees = Vector3(-62, -150, 0)
 	get_viewport().transparent_bg = true
+	get_viewport().msaa_3d = Viewport.MSAA_4X
 	# Parked: landing gear (the flight model has none), sized from the airframe's bounds.
 	var box := AABB()
 	var first := true

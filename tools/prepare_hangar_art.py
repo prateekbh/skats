@@ -120,6 +120,18 @@ def defs() -> str:
   <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
     <stop offset="0" stop-color="#d8f0e8" stop-opacity="0.55"/><stop offset="1" stop-color="#d8f0e8" stop-opacity="0"/>
   </radialGradient>
+  <radialGradient id="warm" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#ffd27a" stop-opacity="0.35"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="pool" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#f4f0d2" stop-opacity="0.32"/><stop offset="1" stop-color="#f4f0d2" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff4cc" stop-opacity="0.28"/><stop offset="1" stop-color="#fff4cc" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="shadeDown" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#050a0c" stop-opacity="0.7"/><stop offset="1" stop-color="#050a0c" stop-opacity="0"/>
+  </linearGradient>
   <radialGradient id="vignette" cx="0.5" cy="0.45" r="0.75">
     <stop offset="0.5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.65"/>
   </radialGradient>
@@ -266,20 +278,42 @@ def wall_details() -> str:
 
 
 def stairs() -> str:
-    """Concrete stairs climbing to the left, with a railing."""
+    """Concrete stairs beside the pillar, climbing to a landing with a lit doorway up to the yard."""
     o = []
-    steps = 7
-    for k in range(steps):
-        y = 312 - k * 13
-        x0 = -110 + k * 4
-        x1 = 44 - k * 6
-        o.append(poly([(x0, y - 13), (x1, y - 15), (x1 + 4, y), (x0, y + 2)], "#7f9a96" if k % 2 == 0 else "#748f8b", width=2.5))
-        o.append(line((x0, y - 13), (x1, y - 15), "#a9c0bb", 2))
-    # Railing.
-    o.append(path([("M", 40, 300), ("L", -60, 205)], stroke=INK, width=10) + path([("M", 40, 300), ("L", -60, 205)], stroke=STEEL, width=5))
-    for t in (0.0, 0.33, 0.66, 1.0):
-        a = lerp((40, 300), (-60, 205), t)
-        o.append(line(a, (a[0] + 2, a[1] + 34), INK, 8) + line(a, (a[0] + 2, a[1] + 34), STEEL, 4))
+    land_y, x_top, x_bot, y_bot, n = 186, -4, 74, 306, 9
+    dx, dy = (x_bot - x_top) / n, (y_bot - land_y) / n
+    depth = (-9, -7)  # how far treads recede towards the wall
+    # Doorway in the pillar above the landing: warm light spilling out.
+    o.append(poly([(-98, 104), (-44, 104), (-44, 180), (-98, 180)], "#24383b", width=5))
+    o.append(poly([(-92, 110), (-50, 110), (-50, 180), (-92, 180)], "#f2d58a", width=3))
+    o.append(poly([(-92, 110), (-74, 113), (-74, 180), (-92, 180)], "#c99a4a", stroke=None))
+    o.append(f'<ellipse cx="{X(-71)}" cy="{Y(98)}" rx="{9 * S}" ry="{4 * S}" fill="#ffcf6a" stroke="{INK}" stroke-width="3"/>')
+    o.append(f'<ellipse cx="{X(-71)}" cy="{Y(140)}" rx="{55 * S}" ry="{48 * S}" fill="url(#warm)"/>')
+    # Landing slab on two posts.
+    o.append(poly([(-122, land_y - 7), (x_top + depth[0], land_y + depth[1]), (x_top, land_y), (-122, land_y)], "#a9bfb9", width=3.5))
+    o.append(poly([(-122, land_y), (x_top, land_y), (x_top, land_y + 9), (-122, land_y + 9)], "#5d7773", width=3.5))
+    o.append(poly([(-92, 180), (-50, 180), (-30, land_y), (-110, land_y)], "#f5dc9a", stroke=None, extra='opacity="0.55"'))
+    for px in (-100, -40):
+        o.append(poly([(px, land_y + 9), (px + 9, land_y + 9), (px + 9, 318), (px, 320)], "#4c6562", width=3.5))
+    # Solid side of the flight, then treads and risers top to bottom.
+    side = [(x_top, land_y + 9)]
+    for k in range(n):
+        side += [(x_top + k * dx, land_y + k * dy), (x_top + (k + 1) * dx, land_y + k * dy)]
+    side += [(x_bot, y_bot), (x_bot, y_bot + 3), (x_top + 6, y_bot + 8)]
+    o.append(poly(side, "#4f6a67", width=4))
+    for k in range(n - 1):
+        y = land_y + (k + 1) * dy
+        x0, x1 = x_top + (k + 1) * dx, x_top + (k + 2) * dx
+        o.append(poly([(x0 + depth[0], y + depth[1]), (x1 + depth[0], y + depth[1]), (x1, y), (x0, y)], "#a3bab4", width=3))
+        o.append(poly([(x0, y), (x1, y), (x1, y + dy), (x0, y + dy)], "#71908b", width=3))
+        o.append(line((x0 + 1, y + 1.5), (x1 - 1, y + 1.5), "#e0b532", 3))  # worn safety nosing
+    # Railing up the flight and along the landing edge.
+    rail = [(x_bot - 2, y_bot - 34), (x_top, land_y - 34), (-120, land_y - 34)]
+    for a_, b_ in zip(rail, rail[1:]):
+        o.append(line(a_, b_, INK, 11) + line(a_, b_, STEEL, 6) + line(a_, b_, "#c5d3d8", 2))
+    posts = [lerp(rail[0], rail[1], t) for t in (0.0, 0.33, 0.66, 1.0)] + [(-40, land_y - 34), (-80, land_y - 34), (-118, land_y - 34)]
+    for p_ in posts:
+        o.append(line(p_, (p_[0], p_[1] + 33), INK, 9) + line(p_, (p_[0], p_[1] + 33), STEEL, 4.5))
     return "\n".join(o)
 
 
@@ -339,7 +373,11 @@ def arms() -> str:
 
 def missile_crate() -> str:
     """A strapped bundle of red-tipped missiles in the left foreground."""
-    o = ['<g id="crate">']
+    # Drawn at the reference's foreground size, then set back beside the left wall at half size.
+    k = 0.5
+    tx, ty = X(96) - X(40) * k, Y(374) - Y(484) * k
+    o = [f'<g id="crate" transform="translate({tx:.1f} {ty:.1f}) scale({k})">']
+    o.append(f'<ellipse cx="{X(300)}" cy="{Y(484)}" rx="{280 * S}" ry="{14 * S}" fill="#0d1414" opacity="0.5"/>')
     rows = [(360, 4), (388, 5), (418, 5), (450, 5)]
     for (y, n) in rows:
         pass
@@ -372,7 +410,10 @@ def missile_crate() -> str:
 
 def tyre() -> str:
     cx, cy = 640, 400
-    o = ['<g id="tyre">']
+    k = 0.42
+    tx, ty = X(668) - X(cx) * k, Y(318) - Y(cy) * k
+    o = [f'<g id="tyre" transform="translate({tx:.1f} {ty:.1f}) scale({k})">']
+    o.append(f'<ellipse cx="{X(cx + 10)}" cy="{Y(cy + 86)}" rx="{70 * S}" ry="{10 * S}" fill="#0d1414" opacity="0.5"/>')
     o.append(f'<ellipse cx="{X(cx + 16)}" cy="{Y(cy)}" rx="{56 * S}" ry="{88 * S}" fill="#15171b" stroke="{INK}" stroke-width="4"/>')
     o.append(f'<ellipse cx="{X(cx)}" cy="{Y(cy)}" rx="{56 * S}" ry="{88 * S}" fill="#24272d" stroke="{INK}" stroke-width="4"/>')
     for k in range(10):
@@ -398,11 +439,72 @@ def grime() -> str:
 <rect x="0" y="0" width="{W}" height="{H}" fill="url(#vignette)"/>"""
 
 
+def props() -> str:
+    """Floor clutter: a power cable to the jet, a rolling tool chest and oil drums."""
+    o = []
+    # Power cable from the wall junction box, snaking across the floor to the jet.
+    cable = [("M", 96, 270), ("C", 120, 330, 210, 352, 300, 340), ("C", 380, 330, 360, 290, 395, 282)]
+    o.append(path(cable, stroke=INK, width=11) + path(cable, stroke="#1d2226", width=6))
+    # Rolling tool chest.
+    x, y = 520, 330
+    o.append(f'<ellipse cx="{X(x + 22)}" cy="{Y(y + 2)}" rx="{30 * S}" ry="{4 * S}" fill="#0d1414" opacity="0.5"/>')
+    o.append(poly([(x, y - 46), (x + 44, y - 46), (x + 44, y - 4), (x, y - 4)], "#b8261d", width=4.5))
+    o.append(poly([(x, y - 46), (x + 8, y - 52), (x + 52, y - 52), (x + 44, y - 46)], "#d9473a", width=4))
+    o.append(poly([(x + 44, y - 46), (x + 52, y - 52), (x + 52, y - 10), (x + 44, y - 4)], "#7a1610", width=4))
+    for k in range(4):
+        yy = y - 40 + k * 9
+        o.append(poly([(x + 4, yy), (x + 40, yy), (x + 40, yy + 7), (x + 4, yy + 7)], "#a11f17", width=2.5))
+        o.append(line((x + 16, yy + 3.5), (x + 28, yy + 3.5), "#e6e6e6", 3))
+    for wx in (x + 6, x + 38):
+        o.append(f'<circle cx="{X(wx)}" cy="{Y(y - 1)}" r="{3.2 * S}" fill="#15171b" stroke="{INK}" stroke-width="3"/>')
+    o.append(poly([(x + 8, y - 58), (x + 30, y - 58), (x + 30, y - 52), (x + 8, y - 52)], "#58646b", width=3))  # toolbox on top
+    # Oil drums by the right wall.
+    for (dx, dy, col) in [(668, 268, "#3c6b45"), (690, 274, "#2f5a8a"), (676, 284, "#3c6b45")]:
+        o.append(f'<ellipse cx="{X(dx)}" cy="{Y(dy + 1)}" rx="{13 * S}" ry="{3 * S}" fill="#0d1414" opacity="0.45"/>')
+        o.append(f'<rect x="{X(dx - 11)}" y="{Y(dy - 34)}" width="{22 * S}" height="{34 * S}" fill="{col}" stroke="{INK}" stroke-width="4"/>')
+        for band in (0.3, 0.7):
+            o.append(line((dx - 11, dy - 34 + 34 * band), (dx + 11, dy - 34 + 34 * band), INK, 3))
+        o.append(f'<ellipse cx="{X(dx)}" cy="{Y(dy - 34)}" rx="{11 * S}" ry="{3 * S}" fill="#6f8f78" stroke="{INK}" stroke-width="3.5"/>')
+        o.append(line((dx - 7, dy - 30), (dx - 7, dy - 4), "#ffffff", 3, 'opacity="0.25"'))
+    return "\n".join(o)
+
+
+def lighting() -> str:
+    """Hanging work lamps with light cones and pools, plus shading under the ceiling and in corners."""
+    o = []
+    # Shade: the top of the walls falls into the ceiling's darkness; the floor corner gets AO.
+    o.append(poly([(50, 12), (300, 128), (300, 170), (50, 90)], "url(#shadeDown)", stroke=None))
+    o.append(poly([(565, 118), (760, 60), (760, 140), (565, 170)], "url(#shadeDown)", stroke=None))
+    o.append(poly([(50, 270), (300, 236), (300, 246), (50, 292)], "#0b1414", stroke=None, extra='opacity="0.45"'))
+    o.append(poly([(565, 236), (760, 280), (760, 300), (565, 246)], "#0b1414", stroke=None, extra='opacity="0.45"'))
+    # Hazard stripes along the foot of the left wall.
+    for k in range(26):
+        u0, u1 = k / 26, (k + 0.5) / 26
+        a0, a1 = lerp((50, 284), (300, 240), u0), lerp((50, 284), (300, 240), u1)
+        o.append(poly([a0, a1, (a1[0] + 3, a1[1] + 5.5), (a0[0] + 3, a0[1] + 5.5)], "#d9a92a", stroke=None, extra='opacity="0.45"'))
+    # Lamps: shade, bulb, a soft cone and a pool of light on the floor.
+    for (lx, ly, fy, fr) in [(250, 70, 300, 70), (420, 108, 270, 95), (610, 96, 300, 60)]:
+        o.append(line((lx, 0), (lx, ly - 8), INK, 4))
+        o.append(poly([(lx - 22, fy - 2), (lx - 6, ly + 2), (lx + 6, ly + 2), (lx + 22, fy - 2)], "url(#cone)", stroke=None))
+        o.append(f'<ellipse cx="{X(lx)}" cy="{Y(fy)}" rx="{fr * S}" ry="{fr * 0.18 * S}" fill="url(#pool)"/>')
+        o.append(poly([(lx - 9, ly), (lx + 9, ly), (lx + 5, ly - 8), (lx - 5, ly - 8)], "#2b3a40", width=3))
+        o.append(f'<ellipse cx="{X(lx)}" cy="{Y(ly + 1)}" rx="{6 * S}" ry="{2.2 * S}" fill="#fff6d0" stroke="{INK}" stroke-width="2"/>')
+    # Rivet rows on the left wall panels.
+    for v in (0.36, 0.8):
+        for i in range(40):
+            p = quad_pt(LW, (i + 0.5) / 40, v)
+            o.append(f'<circle cx="{X(p[0])}" cy="{Y(p[1])}" r="2.6" fill="#2c474a"/>')
+    return "\n".join(o)
+
+
 def build_svg() -> str:
     layers = [
-        ('back', room() + wall_details() + stairs()),
+        ('back', room() + wall_details()),
         ('floor', floor()),
+        ('stairs', stairs()),
+        ('props', props()),
         ('grime', grime()),
+        ('light', lighting()),
         ('arms', arms()),
         ('fore', missile_crate() + tyre()),
     ]
@@ -435,8 +537,10 @@ def render_jet(out: Path) -> None:
     from PIL import Image
     with tempfile.TemporaryDirectory() as tmp:
         raw = Path(tmp) / "jet.png"
-        subprocess.run(["xvfb-run", "-a", "-s", f"-screen 0 {W}x{H}x24", "godot", "--path", str(ROOT),
-                        "--rendering-driver", "opengl3", "--resolution", f"{W}x{H}", "--", f"--hangarjet={raw}"],
+        # Rendered at twice the canvas size (with 4x MSAA in the game) and scaled down: clean edges.
+        rw, rh = W * 2, H * 2
+        subprocess.run(["xvfb-run", "-a", "-s", f"-screen 0 {rw}x{rh}x24", "godot", "--path", str(ROOT),
+                        "--rendering-driver", "opengl3", "--resolution", f"{rw}x{rh}", "--", f"--hangarjet={raw}"],
                        check=True, capture_output=True)
         jet = Image.open(raw).convert("RGBA")
     jet = jet.crop(jet.getbbox())
