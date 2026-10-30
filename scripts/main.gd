@@ -62,6 +62,8 @@ func _ready() -> void:
 		_fx_showcase.call_deferred()
 	elif _opts.has("weaponshow"):
 		_weapon_showcase.call_deferred()
+	elif _opts.has("hangarjet"):
+		_hangar_jet.call_deferred()
 	elif _autotest:
 		start_episode(Game.episode_by_id(_opts.get("episode", "ep01")))
 	elif _opts.has("snap") and not _opts.has("intro"):
@@ -442,6 +444,71 @@ func _showcase() -> void:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/%s.png" % [_opts.showcase, v_name])
 		print("[showcase] ", v_name)
+	get_tree().quit()
+
+
+## --hangarjet=<png>: our TurboKat parked in the launch-screen hangar, rendered alone on a
+## transparent background from the angle of the hangar backdrop (tools/prepare_hangar_art.py),
+## under hangar lighting: a cool teal fill and a warm overhead work light.
+func _hangar_jet() -> void:
+	_show_title()
+	menu.hide_all()
+	hud.visible = false
+	set_process(false)
+	player.set_process(false)
+	city.visible = false
+	var at := Vector3(0, 3000, 0)
+	player.global_position = at
+	player.global_transform.basis = Basis()
+	player.speed = 0.0
+	player.throttle = 0.0
+	player.boosting = false
+	player._effects(0.016)
+	for n in world.get_children():
+		if n is WorldEnvironment:
+			var env: Environment = n.environment
+			env.background_mode = Environment.BG_CLEAR_COLOR
+			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+			env.ambient_light_color = Color(0.56, 0.62, 0.64)
+			env.ambient_light_energy = 0.55
+			env.fog_enabled = false
+		elif n is DirectionalLight3D:
+			n.light_color = Color(1.0, 0.93, 0.8)
+			n.light_energy = 1.5
+			n.rotation_degrees = Vector3(-62, -150, 0)
+	get_viewport().transparent_bg = true
+	# Parked: landing gear (the flight model has none), sized from the airframe's bounds.
+	var box := AABB()
+	var first := true
+	for vi in player.find_children("*", "VisualInstance3D", true, false):
+		if not (vi as VisualInstance3D).is_visible_in_tree():
+			continue
+		var b: AABB = vi.global_transform * (vi as VisualInstance3D).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	var gear_mat := MeshKit.toon(Color(0.55, 0.58, 0.62), 0.6, 0.4)
+	var tyre_mat := MeshKit.toon(Color(0.08, 0.08, 0.1), 0.0, 0.8)
+	var len := box.size.z
+	var floor_y := box.position.y - len * 0.07
+	for g in [[0.0, 0.2], [-0.16, 0.66], [0.16, 0.66]]:
+		var x: float = box.get_center().x + box.size.x * g[0]
+		var z: float = box.position.z + len * g[1]
+		var top := box.position.y + box.size.y * 0.25
+		var strut := MeshKit.part(player, MeshKit.cyl(len * 0.012, len * 0.012, top - floor_y, 8), gear_mat,
+			player.to_local(Vector3(x, (top + floor_y) * 0.5, z)))
+		strut.global_basis = Basis()
+		var wheel := MeshKit.part(player, MeshKit.cyl(len * 0.032, len * 0.032, len * 0.028, 16), tyre_mat,
+			player.to_local(Vector3(x, floor_y + len * 0.032, z)))
+		wheel.global_basis = Basis(Vector3.FORWARD, PI / 2)
+	var c := box.get_center()
+	camera.shot = "script"
+	camera.fov = 24.0
+	camera.global_position = c + Vector3(-len * 1.55, len * 0.42, -len * 1.35)
+	camera.look_at(c + Vector3(0, -len * 0.04, 0), Vector3.UP)
+	for i in 4:
+		await get_tree().process_frame
+	get_viewport().get_texture().get_image().save_png(_opts.hangarjet)
+	print("[hangarjet] saved ", _opts.hangarjet)
 	get_tree().quit()
 
 
