@@ -104,7 +104,7 @@ written fresh for this project; no lines are copied from the series.
 
 | # | Working title | Villain | Set piece | Status |
 |---|---|---|---|---|
-| 1 | Dark Skies Over Megakat | Dark Kat | Creepling glider waves, then Dark Kat's warship (turrets, then the armored hull) | **Playable in v0.1** |
+| 1 | Dark Skies Over Megakat | Dark Kat | Creepling glider waves, then Dark Kat's Fear Ship II (turrets, then the armored hull) | **Playable in v0.1** |
 | 2 | Turmoil Rising | Turmoil | Flying-fortress chase through the clouds; boarding drones | Planned |
 | 3 | Viper's Swamp | Dr. Viper | Mutated plant tendrils grabbing at the TurboKat over the city; bio-pod weak points | Planned |
 | 4 | Pastmaster's Rift | The Pastmaster | Time rift spawns prehistoric fliers; a dragon boss | Planned |
@@ -113,7 +113,23 @@ written fresh for this project; no lines are copied from the series.
 | ∞ | Free Flight: Endless Defense | Everyone | Escalating waves, score attack | **Playable in v0.1** |
 
 **Recurring cast (radio):** Razor (weapons, gadgets), T-Bone (pilot), Callie Briggs (deputy
-mayor, mission giver), Commander Feral (rival, "stay out of Enforcer business").
+mayor, mission giver), Commander Feral (rival, "stay out of Enforcer business"), Lt. Felina Feral
+(capable niece who gives the SWAT Kats the benefit of the doubt), Mayor Manx (cowardly, golf),
+Ann Gora (news reporter in the Good Kat Blimp). Characters and their traits follow swatkats.info.
+
+### Episode 1: Dark Skies Over Megakat (three parts)
+
+Dark Kat is cutting the city's head off, piece by piece: Enforcer HQ, then City Hall, then HQ
+again with the bomb. Story is told as comic strips (`ComicStrip`, `scripts/missions/ep01_dark_skies.gd`):
+
+| Beat | When | What happens |
+|---|---|---|
+| **Opening** (6 panels, 2 pages, "Drop Bomb" plays) | After the episode is chosen, before the hatch launch | Ann Gora's news flash from the blimp; Manx on the golf course wants his limo; Feral: "Dark Kat hit this building the day it opened. Two of my pilots stopped him. Best I ever had." (the Enforcer pilots were Chance Furlong and Jake Clawson); T-Bone: not one word, buddy; Callie calls for help from City Hall; Razor answers |
+| **Part 1: First Strike** | Creepling gliders over Enforcer HQ | In flight Razor realises they're dragging the Enforcer jets away from HQ. Strip: Feral wants his airspace; Felina sees HQ was bait; Ann's blimp is clipped; Razor: the city's head is coming off piece by piece, and bombers are on radar |
+| **Part 2: Breaking News** | Gliders and bombers over City Hall | Callie stays to run the evacuation, Manx hides under his desk. Strip: Dark Kat hijacks every channel, "by dawn this will be Dark Kat City"; Callie: the bomb bay is aimed at the Enforcer building; Ann's camera sees the warship rise from the clouds; Razor: it's a flying fortress |
+| **Part 3: Dark Kat City** | The Fear Ship II (turrets, then the armored hull) | Felina flies cover; Dark Kat launches every glider. Epilogue strip: Dark Kat flees; Feral says the SWAT Kats are still under investigation, Felina: "of course they are, Uncle"; Manx takes credit; Ann: who saved us, two pilots nobody can name; Callie thanks them |
+
+The opening can be skipped with Esc. The hatch launch follows it and hands over the controls.
 
 ## 6. Enemies (v0.1)
 

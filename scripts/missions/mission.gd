@@ -13,6 +13,12 @@ func start() -> void:
 	pass
 
 
+## The opening story, played as comic-strip panels after the episode is chosen and before the
+## hatch launch (see ComicStrip). Empty for episodes without one.
+func intro() -> Array:
+	return []
+
+
 func update(_dt: float) -> void:
 	pass
 
@@ -51,6 +57,8 @@ func radio(who: String, text: String, seconds := 4.5, mood := "") -> void:
 
 ## A comic-strip cutscene (game paused), then `then`. Panels: see ComicStrip.
 func cutscene(panels: Array, then: Callable) -> void:
+	if finished: # the player went down while the scene was waiting to start
+		return
 	main.show_comic(panels, then)
 
 

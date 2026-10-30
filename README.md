@@ -38,7 +38,7 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 ## What's in v0.1
 
 - **The TurboKat:** a community 3D model painted in the show's colours (glossy black, red cockpit pod with royal-blue glass, blue wingtips and nose, red engines with spinning turbines). Its wings swing back at high speed and spread open when slow, and it's cel-shaded with cartoon outlines. A procedural fallback airframe is built if the model files are missing.
-- **Launcher:** a comic-book page. Razor and T-Bone, Callie, Dark Kat and Turmoil in ink-bordered panels around a big centre panel with our TurboKat over Megakat City and the menu (stages, briefings, controls, settings). The panels slam in one by one on open while "Big Trouble" plays, and the game loads behind the page. Choosing a stage plays the launch: the salvage-yard hatch opens and the TurboKat bursts out and climbs away over the city.
+- **Launcher:** a comic-book page. Razor and T-Bone, Callie, Dark Kat and Turmoil in ink-bordered panels around a big centre panel with our TurboKat over Megakat City and the menu (stages, briefings, controls, settings). The panels slam in one by one on open while "Big Trouble" plays, and the game loads behind the page. Choosing a stage plays the episode's opening story as a comic strip with its own music (Esc skips), then the launch: the salvage-yard hatch opens and the TurboKat bursts out and climbs away over the city.
 - **Arcade flight model:** bank-to-turn, auto-level, afterburner, speed gained in dives and lost in climbs.
 - **Weapons:** twin cannons with overheat, Blowtorch homing missiles, and a rack of the show's
   special missiles (from the swatkats.info weapons catalogue): the **Octopus** (captures a target),
@@ -64,8 +64,9 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 - **Episode 1, *Dark Skies Over Megakat*:** two Creepling waves, then Dark Kat's warship (destroy the turrets, then the hull). Original radio dialogue for Razor, T-Bone, Callie, Feral and Dark Kat.
 - **Free Flight:** endless escalating waves for score attack.
 - **Story:** radio chatter arrives as comic cards with the speaker's portrait and an expression for
-  the line, and between waves the game pauses for comic-strip story beats from Commander Feral,
-  Lt. Felina Feral, Mayor Manx and Deputy Mayor Callie Briggs (and Dark Kat). After the hatch launch
+  the line, and between the parts of an episode the game pauses for comic-strip story beats from
+  Commander Feral, Lt. Felina Feral, Mayor Manx, Deputy Mayor Callie Briggs, Ann Gora and Dark Kat.
+  Episode 1 is in three parts with an opening story and an epilogue. After the hatch launch
   the player has the controls straight away.
 - **Presentation:** HUD with radar, lock-on and warnings; briefing and debrief screens with ranks and saved best scores; all sound effects synthesized at runtime.
 
@@ -73,8 +74,9 @@ See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan 
 
 ## Credits
 
-- Music: "Big Trouble" from the SWAT Kats score, © its owners, used in this non-commercial fan
-  project. Trimmed to start at 0:04 (`web/launch/big_trouble.mp3`).
+- Music: "Big Trouble" and "Drop Bomb" from the SWAT Kats score, © its owners, used in this
+  non-commercial fan project. "Big Trouble" is trimmed to start at 0:04 (`web/launch/big_trouble.mp3`);
+  "Drop Bomb" (`web/launch/drop_bomb.mp3`) plays during Episode 1's opening story.
 - Character art and logo on the launch screen: SWAT Kats artwork © Hanna-Barbera / Warner Bros.
   Discovery, used in this non-commercial fan project. The T-Bone and Razor poster is fan art signed
   "Feno 2011". Processed by `tools/prepare_launch_art.py` (cut-outs, traced vector logo).

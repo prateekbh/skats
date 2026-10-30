@@ -84,7 +84,7 @@ func _build() -> void:
 
 	hull = Hull.new()
 	hull.ship = self
-	hull.display_name = "Warship Hull"
+	hull.display_name = "Fear Ship II Hull"
 	hull.set_max_hp(1400.0)
 	hull.radius = 45.0
 	hull.score = 5000

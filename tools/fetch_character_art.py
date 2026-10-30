@@ -32,6 +32,8 @@ ART = {
     "feral_angry": ("2018/07/t-bone-commander-feral.jpg", (430, 0, 640, 210), (280, 0, 640, 270)),
     "felina_alert": ("2018/06/lt-felina-feral.png", (150, 10, 340, 200), (40, 0, 500, 345)),
     "manx_smug": ("2018/06/mayor-manx.png", (80, 20, 300, 240), (0, 0, 483, 320)),
+    "manx_golf": ("2018/07/mayor-manx-012.jpg", (255, 90, 415, 250), None),
+    "ann_reporting": ("2018/06/ann-gora.png", (190, 20, 510, 340), (60, 0, 640, 480)),
     "manx_nervous": ("2018/07/mayor-manx-button-pin.jpg", (140, 0, 410, 270), None),
     "tbone_grin": ("local:swat_kats_duo.png", (88, 52, 208, 172), (40, 20, 280, 200)),
     "tbone_scared": ("2018/05/fear-of-bugs.jpg", (250, 0, 600, 350), None),

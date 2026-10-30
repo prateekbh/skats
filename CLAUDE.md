@@ -37,7 +37,11 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   (`Mission.radio(who, text, seconds, mood)`) and `ComicStrip` cutscenes between waves
   (`Mission.cutscene(panels, then)`, game paused). New speakers or moods go in `Comic.SPEAKERS` and
   `fetch_character_art.py`. Autotests skip cutscenes unless `--comic`; `--launch` starts an autotest
-  through the hatch launch.
+  through the hatch launch. An episode's strips live in its mission script (`strips()`; `intro()` is
+  the opening, played after the episode is chosen and before the hatch launch, with the story music).
+  Strips of more than three panels split into pages. `--comicshow=<dir>` saves every page of Episode 1.
+- Music (`scripts/autoload/music.gd` + `window.skMusic` in the shell) has two tracks that crossfade:
+  the launcher theme and the episode story track.
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
   created per shot or per explosion. Effects go through the pooled `VFX` system
   (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.

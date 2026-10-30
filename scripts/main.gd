@@ -19,6 +19,7 @@ extends Node
 ##   --weaponshow=<dir>    photograph the special-missile models and their effects, then quit
 ##   --showcase=<dir>      photograph the TurboKat from several angles into <dir>, then quit
 ##   --jetrender=<png>     render the TurboKat in flight on a transparent background, then quit
+##   --comicshow=<dir>     play Episode 1's comic strips quickly and save every page, then quit
 
 enum State { INTRO, TITLE, PLAYING, PAUSED, DEBRIEF }
 
@@ -34,6 +35,7 @@ var camera: ChaseCamera
 var hud: Control
 var menu: Control
 var comic: ComicStrip
+var _comic_gen := 0
 var mission: Mission
 var episode: Dictionary
 
@@ -77,6 +79,8 @@ func _ready() -> void:
 		_weapon_showcase.call_deferred()
 	elif _opts.has("jetrender"):
 		_jet_render.call_deferred()
+	elif _opts.has("comicshow"):
+		_comic_showcase.call_deferred()
 	elif _autotest:
 		var ep := Game.episode_by_id(_opts.get("episode", "ep01"))
 		if _opts.has("launch"):
@@ -171,20 +175,26 @@ func _build_ui() -> void:
 	layer.add_child(comic)
 
 
-## Plays a comic-strip cutscene with the game paused, then calls `then`. Autotests skip
-## it unless --comic is given.
-func show_comic(panels: Array, then: Callable) -> void:
+## Plays a comic-strip cutscene, then calls `then`. Autotests skip it unless --comic is given.
+## `pause`: freeze the game while it plays (not needed on the title screen).
+func show_comic(panels: Array, then: Callable, pause := true) -> void:
 	if (_autotest and not _opts.has("comic")) or panels.is_empty():
 		then.call()
 		return
 	_end_missile_cam()
-	get_tree().paused = true
+	if pause:
+		get_tree().paused = true
 	Sfx.set_engine(false, 0, 0)
+	# A strip dropped by a restart or quit must not resume its old callback later.
+	_comic_gen += 1
+	var gen := _comic_gen
 	comic.play(panels)
 	await comic.finished
-	if state == State.PLAYING:
+	if gen != _comic_gen:
+		return
+	if pause:
 		get_tree().paused = false
-		then.call()
+	then.call()
 
 
 func spawn_creepling(pos: Vector3, heavy: bool, anchor: Vector3) -> Creepling:
@@ -205,6 +215,7 @@ func _clear_world() -> void:
 	_end_missile_cam()
 	combat.clear()
 	comic.cancel()
+	_comic_gen += 1
 	city.reset_damage() # the damage stays until the next stage starts
 	for n in get_tree().get_nodes_in_group("mission_spawn"):
 		n.queue_free()
@@ -293,12 +304,21 @@ func _show_title() -> void:
 
 
 ## A stage was chosen: the TurboKat launches from the hatch, then the mission starts.
+## First the episode's opening story (a comic strip over the title scene, with its own music),
+## then the hatch launch.
 func launch_episode(ep: Dictionary) -> void:
-	if ep.is_empty() or not ep.playable:
+	if ep.is_empty() or not ep.playable or not _launch_ep.is_empty():
 		return
 	_launch_ep = ep
 	WebLauncher.hide()
-	_start_intro()
+	var m: Mission = load(ep.script).new()
+	var intro := m.intro()
+	if intro.is_empty():
+		_start_intro()
+		return
+	if not _autotest:
+		Music.play_story()
+	show_comic(intro, _start_intro, false)
 
 
 ## `from_launch`: straight out of the hatch launch, so the jet keeps flying where it is and the
@@ -570,6 +590,33 @@ func _jet_render() -> void:
 	get_tree().quit()
 
 
+## --comicshow=<dir>: plays every comic strip of Episode 1 quickly and saves each page.
+func _comic_showcase() -> void:
+	_show_title()
+	menu.hide_all()
+	var m: Mission = load(Game.episode_by_id("ep01").script).new()
+	var strips: Dictionary = m.strips()
+	comic.speed = 0.12
+	comic.auto_advance = false
+	for id in strips:
+		comic.play(strips[id])
+		var page := 0
+		while comic.is_active():
+			await get_tree().process_frame
+			if comic.page_complete():
+				for i in 24:
+					await get_tree().process_frame
+				get_viewport().get_texture().get_image().save_png("%s/%s_%d.png" % [_opts.comicshow, id, page])
+				print("[comicshow] ", id, " page ", page)
+				page += 1
+				comic.advance()
+				for i in 12:
+					await get_tree().process_frame
+	comic.speed = 1.0
+	comic.auto_advance = true
+	get_tree().quit()
+
+
 # --- launch cinematic -------------------------------------------------------------------
 
 ## The TurboKat rises out of the salvage-yard hangar and blasts off over Megakat City.
@@ -587,7 +634,6 @@ func _start_intro() -> void:
 	city.set_hatch(0.0)
 	camera.shot = "script"
 	menu.show_intro()
-	Music.play_theme()
 
 
 ## Launch timing: the hatch snaps open, then the TurboKat bursts out of the underground

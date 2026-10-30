@@ -21,6 +21,7 @@ const SPEAKERS := {
 	"Commander Feral": ["feral", "stern"],
 	"Lt. Felina Feral": ["felina", "alert"],
 	"Mayor Manx": ["manx", "smug"],
+	"Ann Gora": ["ann", "reporting"],
 	"T-Bone": ["tbone", "grin"],
 	"Razor": ["razor", "focused"],
 	"Dark Kat": ["dark_kat", "sneer"],

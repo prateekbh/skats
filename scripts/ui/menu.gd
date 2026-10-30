@@ -237,7 +237,7 @@ func show_title() -> void:
 
 
 func _choose(ep: Dictionary) -> void:
-	show_briefing(ep)
+	launch.emit(ep) # the episode's story plays next (Main.launch_episode)
 
 
 func show_briefing(ep: Dictionary) -> void:

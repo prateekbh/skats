@@ -256,51 +256,78 @@ const engine = new Engine(GODOT_CONFIG);
 // Theme music. Starts on the launcher and keeps playing into the game, which drives it
 // through window.skMusic (see scripts/autoload/music.gd).
 window.skMusic = (function () {
-	const audio = document.getElementById('sk-music');
 	const button = document.getElementById('sound-toggle');
 	const label = document.getElementById('sound-label');
-	let target = 0.7;
+	// Two tracks: the launcher theme, and the Episode 1 story music. play() crossfades.
+	const tracks = {
+		theme: { audio: document.getElementById('sk-music'), loop: true },
+		story: { audio: new Audio('launch/drop_bomb.mp3'), loop: true }, // loops if the reading outlasts it; fades out at handover
+	};
+	Object.values(tracks).forEach((t) => {
+		t.audio.loop = t.loop;
+		t.audio.preload = 'auto';
+		t.audio.volume = 0;
+		t.target = 0;
+		t.timer = null;
+		t.audio.addEventListener('play', render);
+		t.audio.addEventListener('pause', render);
+	});
+	let current = 'theme';
 	let muted = false;
-	let fadeTimer = null;
-	audio.volume = 0;
 
 	function render() {
-		const playing = !audio.paused && !muted;
+		const playing = !muted && Object.values(tracks).some((t) => !t.audio.paused);
 		button.classList.toggle('on', playing);
 		button.setAttribute('aria-pressed', String(playing));
 		label.textContent = playing ? 'SOUND OFF' : 'SOUND ON';
 	}
-	function fadeTo(volume, seconds) {
-		target = volume;
-		clearInterval(fadeTimer);
-		if (volume > 0 && audio.paused && !muted) {
-			audio.volume = 0; // always fade in from silence
-			audio.play().then(render, () => {
-				// Autoplay blocked: stay silent until the first click or key (see unlock()).
-				clearInterval(fadeTimer);
-				audio.volume = 0;
-				render();
-			});
-		}
-		const start = audio.volume;
+	// Moves one track's volume to `volume` (0 stops it) over `seconds`.
+	function fade(t, volume, seconds) {
+		t.target = volume;
+		clearInterval(t.timer);
+		const start = t.audio.volume;
 		const goal = muted ? 0 : volume;
 		const steps = Math.max(1, Math.round((seconds || 0) * 30));
 		let i = 0;
-		fadeTimer = setInterval(() => {
+		t.timer = setInterval(() => {
 			i++;
-			audio.volume = Math.min(1, Math.max(0, start + (goal - start) * (i / steps)));
+			t.audio.volume = Math.min(1, Math.max(0, start + (goal - start) * (i / steps)));
 			if (i >= steps) {
-				clearInterval(fadeTimer);
+				clearInterval(t.timer);
 				if (goal === 0 && volume === 0) {
-					audio.pause();
+					t.audio.pause();
 				}
 				render();
 			}
 		}, 1000 / 30);
 	}
+	// Plays `name` at `volume`, fading every other track out. `restart` starts it from the top.
+	function play(name, volume, seconds, restart) {
+		current = name;
+		const t = tracks[name];
+		Object.entries(tracks).forEach(([key, other]) => {
+			if (key !== name && !other.audio.paused) fade(other, 0, seconds);
+		});
+		if (volume > 0 && (t.audio.paused || restart) && !muted) {
+			if (restart) t.audio.currentTime = 0;
+			t.audio.volume = 0; // always fade in from silence
+			t.audio.play().then(render, () => {
+				// Autoplay blocked: stay silent until the first click or key (see unlock()).
+				clearInterval(t.timer);
+				t.audio.volume = 0;
+				render();
+			});
+		}
+		fade(t, volume, seconds);
+	}
+	// The old single-track call: volume change on whatever is current (0 fades it out).
+	function fadeTo(volume, seconds) {
+		play(current, volume, seconds, false);
+	}
 	function setMuted(value) {
 		muted = value;
-		fadeTo(target, 0.3);
+		const t = tracks[current];
+		fade(t, t.target, 0.3);
 		render();
 	}
 	// Browsers block sound until the player interacts; any first click, tap or key starts it.
@@ -310,28 +337,33 @@ window.skMusic = (function () {
 			return; // the button handles its own click
 		}
 		UNLOCK_EVENTS.forEach((e) => document.removeEventListener(e, unlock, true));
-		if (!muted && target > 0 && audio.paused) {
-			fadeTo(target, 2.5);
+		const t = tracks[current];
+		if (!muted && t.target > 0 && t.audio.paused) {
+			play(current, t.target, 2.5, false);
 		}
 	}
 	UNLOCK_EVENTS.forEach((e) => document.addEventListener(e, unlock, true));
 	button.addEventListener('click', (ev) => {
 		ev.stopPropagation();
-		if (audio.paused || muted) {
+		const t = tracks[current];
+		if (t.audio.paused || muted) {
 			muted = false;
-			fadeTo(target || 0.7, 1.5);
+			play(current, t.target || 0.7, 1.5, false);
 		} else {
 			setMuted(true);
 		}
 	});
-	audio.addEventListener('play', render);
-	audio.addEventListener('pause', render);
-	fadeTo(target, 2.5); // try to autoplay with a fade-in
-	return { fadeTo, setMuted };
+	play('theme', 0.7, 2.5, false); // try to autoplay with a fade-in
+	// For tests: what is playing right now.
+	function state() {
+		return { current, muted, tracks: Object.fromEntries(Object.entries(tracks).map(([k, t]) => [k, { paused: t.audio.paused, volume: +t.audio.volume.toFixed(2), time: +t.audio.currentTime.toFixed(1), target: t.target }])) };
+	}
+	return { play, fadeTo, setMuted, state };
 }());
 
 // The comic-page launcher. The game calls show(state) when it is ready (and whenever it returns
-// to the title) and hide() when a stage launches; the page calls window.skGameLaunch(id) and
+// to the title) and hide() when a stage launches (the stage's opening story strip plays in the
+// game, then the hatch launch); the page calls window.skGameLaunch(id) and
 // window.skGameSetting(key, value) (scripts/autoload/web_launcher.gd).
 window.skLauncher = (function () {
 	const root = document.getElementById('launcher');
@@ -350,7 +382,6 @@ window.skLauncher = (function () {
 	};
 	let ready = false;
 	let progress = -1; // -1 = indeterminate
-	const PORTRAITS = { 'Dark Kat': 'dark_kat', 'Turmoil': 'turmoil' };
 	const CONTROLS = [
 		['Pitch / Roll', 'Arrow keys', 'Left stick'],
 		['Rudder', 'A / D', 'Right stick'],
@@ -389,7 +420,7 @@ window.skLauncher = (function () {
 		playable.forEach((ep, i) => {
 			const label = el('span', {}, ep.number + ' · ' + ep.title);
 			const right = el('span', { class: 'best' }, ep.best > 0 ? '★ ' + ep.best : '▶');
-			menu.append(el('button', { class: i === 0 ? 'primary' : '', type: 'button', onclick: () => briefing(ep) }, label, right));
+			menu.append(el('button', { class: i === 0 ? 'primary' : '', type: 'button', onclick: () => launch(ep) }, label, right));
 		});
 		soon.forEach((ep) => {
 			menu.append(el('button', { class: 'soon', type: 'button', disabled: '' }, el('span', {}, ep.number + ' · ' + ep.title), el('span', {}, 'Soon')));
@@ -415,22 +446,6 @@ window.skLauncher = (function () {
 	}
 	back.addEventListener('click', (ev) => { if (ev.target === back) closeSheet(); });
 	document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !back.hidden) closeSheet(); });
-
-	function briefing(ep) {
-		const who = el('div', { class: 'who' });
-		if (PORTRAITS[ep.villain]) who.append(el('img', { src: 'launch/face_' + PORTRAITS[ep.villain] + '.png', alt: '' }));
-		if (ep.villain) who.append(el('span', {}, 'Villain: ' + ep.villain));
-		openSheet(
-			el('div', { class: 'kicker' }, ep.number),
-			el('h2', {}, ep.title),
-			who,
-			el('p', {}, ep.story || ''),
-			el('div', { class: 'kicker' }, 'Objectives'),
-			el('ul', {}, ...(ep.objectives || []).map((o) => el('li', {}, o))),
-			el('div', { class: 'actions' },
-				el('button', { class: 'primary', type: 'button', onclick: () => launch(ep) }, 'Launch the TurboKat!'),
-				el('button', { type: 'button', onclick: closeSheet }, 'Back')));
-	}
 
 	function controls() {
 		const rows = CONTROLS.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))));
