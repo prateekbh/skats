@@ -21,6 +21,7 @@ var _radio_queue: Array = []
 var _radio_t := 0.0
 var _center_t := 0.0
 var _damage := 0.0
+var _banner: Control
 
 
 func _ready() -> void:
@@ -95,6 +96,45 @@ func message(text: String, seconds := 2.5) -> void:
 	_center.text = text
 	_center_t = seconds
 	_center.modulate.a = 1.0
+
+
+## Comic-style title card for a special missile: slams in from the left, holds, fades.
+func banner(def: Dictionary) -> void:
+	if _banner:
+		_banner.queue_free()
+	var col: Color = def.color
+	var panel := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(col.darkened(0.35), 0.92)
+	sb.border_color = Color.BLACK
+	sb.set_border_width_all(4)
+	sb.shadow_color = Color(0, 0, 0, 0.8)
+	sb.shadow_offset = Vector2(6, 6)
+	sb.content_margin_left = 26
+	sb.content_margin_right = 34
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.rotation_degrees = -4.0
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+	var vb := VBoxContainer.new()
+	panel.add_child(vb)
+	var name_l := _label(40, Color(1.0, 0.95, 0.75), HORIZONTAL_ALIGNMENT_LEFT, vb)
+	name_l.text = str(def.name).to_upper() + "!"
+	name_l.add_theme_color_override("font_outline_color", Color.BLACK)
+	name_l.add_theme_constant_override("outline_size", 10)
+	var sub := _label(17, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, vb)
+	sub.text = def.get("blurb", "")
+	sub.add_theme_color_override("font_outline_color", Color.BLACK)
+	sub.add_theme_constant_override("outline_size", 5)
+	panel.position = Vector2(-700, size.y * 0.62)
+	_banner = panel
+	var tw := create_tween().set_ignore_time_scale(true)
+	tw.tween_property(panel, "position:x", 60.0, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.3)
+	tw.tween_property(panel, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(panel.queue_free)
 
 
 func flash_damage() -> void:

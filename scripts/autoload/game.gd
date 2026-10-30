@@ -47,6 +47,8 @@ const EPISODES: Array[Dictionary] = [
 
 var invert_pitch := false
 var muted := false
+## Cinematic camera that follows special missiles.
+var missile_cam := true
 var best_scores := {}
 
 
@@ -89,6 +91,11 @@ func set_muted(value: bool) -> void:
 	_save()
 
 
+func toggle_missile_cam() -> void:
+	missile_cam = not missile_cam
+	_save()
+
+
 func toggle_invert() -> void:
 	invert_pitch = not invert_pitch
 	_save()
@@ -98,6 +105,7 @@ func _save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("settings", "invert_pitch", invert_pitch)
 	cfg.set_value("settings", "muted", muted)
+	cfg.set_value("settings", "missile_cam", missile_cam)
 	for id in best_scores:
 		cfg.set_value("best", id, best_scores[id])
 	cfg.save(SAVE_PATH)
@@ -109,6 +117,7 @@ func _load() -> void:
 		return
 	invert_pitch = cfg.get_value("settings", "invert_pitch", false)
 	muted = cfg.get_value("settings", "muted", false)
+	missile_cam = cfg.get_value("settings", "missile_cam", true)
 	AudioServer.set_bus_mute(0, muted)
 	Music.set_muted.call_deferred(muted)
 	if cfg.has_section("best"):

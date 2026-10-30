@@ -29,7 +29,9 @@ class Pool:
 	var kind := PackedFloat32Array() # puffs: KIND_*, flashes: intensity
 	var drag := PackedFloat32Array()
 	var lift := PackedFloat32Array()
-	var tint := PackedFloat32Array() # flashes: 0 = fire colours, 1 = electric blue
+	var tint := PackedFloat32Array() # flashes: 0 = fire colours, 1 = electric blue; trail puffs: colour id
+	## Frozen pools don't move their particles (beam segments keep `vel` as their vector).
+	var frozen := false
 
 	func _init(capacity: int, mesh: Mesh, material: Material, parent: Node3D, use_colors := false) -> void:
 		cap = capacity
@@ -83,7 +85,7 @@ class Pool:
 			age[i] += dt
 			if age[i] >= life[i]:
 				_remove(i)
-			else:
+			elif not frozen:
 				var v := vel[i] * maxf(0.0, 1.0 - drag[i] * dt)
 				v.y += lift[i] * dt
 				vel[i] = v
@@ -132,6 +134,7 @@ class Pool:
 
 
 var puffs: Pool
+var beams: Pool
 var stars: Pool
 var rings: Pool
 var streaks: Pool
@@ -154,6 +157,14 @@ func _ready() -> void:
 	ring_mat.set_shader_parameter("edge_color", Color(1.0, 0.45, 0.2))
 	rings = Pool.new(48, quad, ring_mat, self)
 
+	var beam_mat := StandardMaterial3D.new()
+	beam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	beam_mat.vertex_color_use_as_albedo = true
+	beam_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	beam_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	beams = Pool.new(300, MeshKit.box(Vector3(1, 1, 1)), beam_mat, self, true)
+	beams.frozen = true
+
 	var streak_mat := StandardMaterial3D.new()
 	streak_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	streak_mat.vertex_color_use_as_albedo = true
@@ -171,19 +182,37 @@ func _icosphere() -> SphereMesh:
 
 func _process(delta: float) -> void:
 	puffs.step(delta)
+	beams.step(delta)
 	stars.step(delta)
 	rings.step(delta)
 	streaks.step(delta)
 	for i in streaks.count:
 		streaks.vel[i].y -= 70.0 * delta # debris falls
 	puffs.draw_scaled()
+	_draw_beams()
 	stars.draw_scaled()
 	rings.draw_scaled()
 	streaks.draw_streaks()
 
 
+## Beam segments: `vel` holds the segment vector, size0 its thickness; they fade out.
+func _draw_beams() -> void:
+	for i in beams.count:
+		var t := beams.age[i] / beams.life[i]
+		var seg := beams.vel[i]
+		var length := seg.length()
+		var dir := seg / length if length > 0.001 else Vector3.FORWARD
+		var up := Vector3.UP if absf(dir.y) < 0.98 else Vector3.RIGHT
+		var th := beams.size0[i] * (1.0 - t * 0.7)
+		var basis := Basis.looking_at(dir, up).scaled(Vector3(th, th, length))
+		beams.mm.set_instance_transform(i, Transform3D(basis, beams.pos[i]))
+		beams.mm.set_instance_color(i, Color(0.75, 0.95, 1.0, 1.0 - t))
+	beams.mm.visible_instance_count = beams.count
+
+
 func clear() -> void:
 	puffs.count = 0
+	beams.count = 0
 	stars.count = 0
 	rings.count = 0
 	streaks.count = 0
@@ -254,6 +283,35 @@ func crackle(p: Vector3) -> void:
 ## A lick of flame on a burning target.
 func burn(p: Vector3) -> void:
 	puffs.spawn(p + _rand_dir() * 2.0, Vector3.UP * 8.0 + _rand_dir() * 3.0, randf_range(0.35, 0.6), 1.0, 2.6, KIND_FIRE, 2.0, 10.0)
+
+
+# --- missile trails (one look per missile type, see Arsenal "trail") ---------------------
+
+## Octopus: puffs of pink ink.
+func ink(p: Vector3) -> void:
+	puffs.spawn(p + _rand_dir() * 0.5, _rand_dir() * 1.5, randf_range(0.6, 0.9), 0.8, 2.6, KIND_TRAIL, 2.0, 0.5, 1.0)
+
+
+## Buzz-Saw: showers of sparks thrown off the spinning blade.
+func sparks(p: Vector3) -> void:
+	for k in 2:
+		streaks.spawn(p, _rand_dir() * randf_range(30.0, 70.0), randf_range(0.2, 0.35), 0.14, 0.05, 0.0, 1.0)
+
+
+## Scrambler: electric crackles and a blue haze.
+func electric_trail(p: Vector3) -> void:
+	stars.spawn(p + _rand_dir() * 1.5, Vector3.ZERO, randf_range(0.1, 0.18), 0.8, 2.6, 0.9, 0.0, 0.0, 1.0)
+	puffs.spawn(p, _rand_dir(), 0.5, 0.4, 1.4, KIND_TRAIL, 2.0, 0.0, 2.0)
+
+
+## Slicer: a glowing beam segment from a to b.
+func beam(a: Vector3, b: Vector3, thickness := 0.35) -> void:
+	beams.spawn((a + b) * 0.5, b - a, 0.35, thickness, thickness, 0.0, 0.0)
+
+
+## Match Head: a burning tail.
+func fire_trail(p: Vector3) -> void:
+	puffs.spawn(p + _rand_dir() * 0.5, _rand_dir() * 2.0, randf_range(0.3, 0.5), 0.9, 2.4, KIND_FIRE, 2.0, 2.0)
 
 
 ## Ground dust (the hangar launch).

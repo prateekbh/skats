@@ -337,6 +337,9 @@ func show_pause() -> void:
 	_button(vb, "Invert pitch: %s" % ("ON" if Game.invert_pitch else "OFF"), func():
 		Game.toggle_invert()
 		show_pause())
+	_button(vb, "Missile cam: %s" % ("ON" if Game.missile_cam else "OFF"), func():
+		Game.toggle_missile_cam()
+		show_pause())
 	_button(vb, "Quit to title", func(): quit_to_title.emit())
 
 

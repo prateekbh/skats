@@ -9,6 +9,7 @@ uniform vec3 sun_dir = vec3(-0.6, 0.45, 0.3);
 varying float v_age;
 varying float v_seed;
 varying float v_kind;
+varying float v_tint;
 varying vec3 v_obj;
 varying vec3 v_world_normal;
 
@@ -32,6 +33,7 @@ void vertex() {
 	v_age = INSTANCE_CUSTOM.x;
 	v_seed = INSTANCE_CUSTOM.y;
 	v_kind = INSTANCE_CUSTOM.z;
+	v_tint = INSTANCE_CUSTOM.w;
 	// Lumpy silhouette: push vertices out by noise so no two puffs look alike.
 	float n = noise(VERTEX * 2.2 + v_seed * 37.0);
 	VERTEX += NORMAL * (n - 0.45) * 0.42;
@@ -60,7 +62,12 @@ void fragment() {
 		vec3 lit_col = vec3(0.42, 0.39, 0.42);
 		vec3 dark_col = vec3(0.22, 0.2, 0.23);
 		if (v_kind > 0.5 && v_kind < 0.85) { lit_col = vec3(0.6, 0.5, 0.4); dark_col = vec3(0.38, 0.31, 0.26); }
-		if (v_kind >= 0.85) { lit_col = vec3(0.86, 0.85, 0.86); dark_col = vec3(0.58, 0.57, 0.62); }
+		if (v_kind >= 0.85) {
+			// Missile trails: 0 white smoke, 1 Octopus pink ink, 2 Scrambler blue haze.
+			lit_col = vec3(0.86, 0.85, 0.86); dark_col = vec3(0.58, 0.57, 0.62);
+			if (v_tint > 0.5 && v_tint < 1.5) { lit_col = vec3(0.95, 0.48, 0.78); dark_col = vec3(0.62, 0.2, 0.48); }
+			if (v_tint >= 1.5) { lit_col = vec3(0.55, 0.8, 1.0); dark_col = vec3(0.25, 0.45, 0.85); }
+		}
 		col = light > 0.15 ? lit_col : dark_col;
 	}
 	// Ink rim for the cel look.

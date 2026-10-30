@@ -4,6 +4,8 @@ extends Node3D
 ## Mega-Missile special. Input comes from the InputMap, or from `ai` when autopilot is on.
 
 signal destroyed
+## Emitted when a special missile is fired: the missiles (Combat entries) and their definition.
+signal special_fired(missiles: Array, def: Dictionary)
 
 const MIN_SPEED := 35.0
 const MAX_SPEED := 360.0
@@ -267,8 +269,9 @@ func _weapons(dt: float) -> void:
 func _fire_special(def: Dictionary) -> void:
 	var launch := global_transform * Vector3(0, -1.8, -1.0)
 	if def.behaviour != "barrage":
-		combat.fire_missile(launch, forward(), speed, lock_target if locked else null, def)
+		special_fired.emit([combat.fire_missile(launch, forward(), speed, lock_target if locked else null, def)], def)
 		return
+	var fired: Array = []
 	var volley: int = def.volley
 	var picks := _volley_targets(volley)
 	for k in volley:
@@ -276,7 +279,8 @@ func _fire_special(def: Dictionary) -> void:
 		var pos := global_transform * Vector3(side * 2.4, -1.2, -0.5)
 		var t: Target = picks[k % picks.size()] if not picks.is_empty() else null
 		var spread: Vector3 = global_transform.basis.x * side * 0.06 + global_transform.basis.y * 0.02
-		combat.fire_missile(pos, (forward() + spread).normalized(), speed, t, def)
+		fired.append(combat.fire_missile(pos, (forward() + spread).normalized(), speed, t, def))
+	special_fired.emit(fired, def)
 
 
 ## Up to `count` targets in a wide cone ahead, nearest to the nose first.

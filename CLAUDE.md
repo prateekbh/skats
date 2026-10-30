@@ -20,7 +20,9 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
 - Run the checks before pushing:
   `godot --headless --path . --import` then `godot --headless --path . -- --autotest --god --seconds=30`.
   CI (`.github/workflows/web.yml`) runs the same smoke test, exports for web and deploys to Pages.
-  `--autotest --god --weapons` fires every special missile at targets and prints the result.
+  `--autotest --god --weapons` fires every special missile at targets and prints the result
+  (the missile cam is skipped in autotests; add `--mcam` to include it, and `--shots=<dir>` under
+  xvfb to photograph it).
 - Screenshots need a display: `xvfb-run godot --path . --rendering-driver opengl3 -- --showcase=<dir>`
   (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--weaponshow=<dir>` (missile models
   and effects), `--snap=<file> [--intro --snap-at=<s>]`

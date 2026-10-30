@@ -232,7 +232,7 @@ func _draw_bullets() -> void:
 ## Fires a missile described by `def` (see Arsenal; defaults to the homing missile).
 ## `target` may be null (dumb-fire). Missile bodies are pooled per type and reused;
 ## their exhaust is drawn by the VFX puff pool.
-func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Target, def: Dictionary = {}) -> void:
+func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Target, def: Dictionary = {}) -> Dictionary:
 	if def.is_empty():
 		def = Arsenal.HOMING
 	var id: String = def.id
@@ -243,12 +243,75 @@ func fire_missile(pos: Vector3, dir: Vector3, launch_speed: float, target: Targe
 	node.visible = true
 	node.global_position = pos
 	safe_look(node, dir)
-	_missiles.append({
+	# Lobbed missiles (Match Head) estimate their flight time to shape the arc.
+	var flight := 1.2
+	if target and is_instance_valid(target):
+		flight = clampf(pos.distance_to(target.global_position) / maxf(def.speed * 0.85, 1.0), 0.6, 3.0)
+	var m := {
 		"node": node, "def": def, "dir": dir.normalized(), "speed": launch_speed + 30.0,
 		"target": target, "life": 7.0, "arm": 0.15, "trail": 0.0,
-	})
+		"base": pos, "t": 0.0, "flight": flight, "phase": randf() * TAU,
+	}
+	_missiles.append(m)
 	var big: bool = def.size > 1.2
 	Sfx.play("missile", -2.0 if big else -5.0, 0.8 if big else 1.0)
+	return m
+
+
+## Sideways offset from the guided course that gives each missile its signature flight.
+## Fades in after launch and out near the target so hits still land.
+func _path_offset(m: Dictionary, dist_to_target: float) -> Vector3:
+	var path: String = m.def.get("path", "straight")
+	if path == "straight" or path == "laser":
+		return Vector3.ZERO
+	var dir: Vector3 = m.dir
+	var right := dir.cross(Vector3.UP)
+	right = right.normalized() if right.length_squared() > 0.001 else Vector3.RIGHT
+	var up := right.cross(dir).normalized()
+	var t: float = m.t
+	var ramp := smoothstep(0.0, 0.18, t) * clampf((dist_to_target - 12.0) / 70.0, 0.0, 1.0)
+	match path:
+		"undulate":
+			return up * sin(t * 7.0 + m.phase) * 4.5 * ramp
+		"spiral":
+			var a: float = t * 16.0 + m.phase
+			return (right * cos(a) + up * sin(a)) * 3.2 * ramp
+		"zigzag":
+			# Triangle waves on two axes: sharp, lightning-like kinks.
+			var tri := absf(fmod(t * 5.0, 2.0) - 1.0) * 2.0 - 1.0
+			var tri2 := absf(fmod(t * 3.3 + 0.4, 2.0) - 1.0) * 2.0 - 1.0
+			return (right * tri * 7.0 + up * tri2 * 3.0) * ramp
+		"arc":
+			var k := clampf(t / m.flight, 0.0, 1.0)
+			return Vector3.UP * sin(PI * k) * 45.0 * clampf((dist_to_target - 6.0) / 40.0, 0.0, 1.0)
+	return Vector3.ZERO
+
+
+## Leaves the missile's signature trail along p0→p1.
+func _missile_trail(m: Dictionary, p0: Vector3, p1: Vector3, moved: float) -> void:
+	var def: Dictionary = m.def
+	var kind: String = def.get("trail", "smoke")
+	if kind == "beam":
+		vfx.beam(p0, p1, 0.45)
+		return
+	m.trail += moved
+	var spacing := 4.0 if def.size > 1.2 else 5.0
+	if kind == "sparks" or kind == "electric":
+		spacing = 6.0
+	while m.trail >= spacing:
+		m.trail -= spacing
+		var p := p1.lerp(p0, clampf(m.trail / maxf(moved, 0.001), 0.0, 1.0))
+		match kind:
+			"ink":
+				vfx.ink(p)
+			"sparks":
+				vfx.sparks(p)
+			"electric":
+				vfx.electric_trail(p)
+			"fire":
+				vfx.fire_trail(p)
+			_:
+				vfx.trail(p, def.size > 1.2)
 
 
 ## Builds a missile body in its canon livery (see Arsenal for the swatkats.info notes).
@@ -327,29 +390,33 @@ func _update_missiles(dt: float) -> void:
 		if tgt != null and (not is_instance_valid(tgt) or not tgt.alive):
 			m.target = null
 			tgt = null
+		m.t += dt
+		# The guide point flies the homing course; the visible missile adds its signature path.
+		var base: Vector3 = m.base
 		if tgt != null and m.arm <= 0.0:
-			var to: Vector3 = (tgt.global_position - node.global_position).normalized()
-			m.dir = steer(m.dir, to, def.turn * dt)
+			# Lead the target: aim where it will be when the missile gets there.
+			var lead: Vector3 = tgt.global_position + tgt.velocity * (base.distance_to(tgt.global_position) / maxf(m.speed, 1.0))
+			m.dir = steer(m.dir, (lead - base).normalized(), def.turn * dt)
+		base += m.dir * m.speed * dt
+		m.base = base
+		var dist_to_target := base.distance_to(tgt.global_position) if tgt != null else 999.0
 		var p0 := node.global_position
-		var p1: Vector3 = p0 + m.dir * m.speed * dt
+		var p1: Vector3 = base + _path_offset(m, dist_to_target)
 		node.global_position = p1
-		safe_look(node, m.dir)
+		var moved := p1 - p0
+		safe_look(node, moved if moved.length_squared() > 0.0001 else m.dir)
 		var spin := node.get_node_or_null("Spin")
 		if spin:
 			spin.rotate_z(dt * 40.0)
-		# Exhaust: a puff every few metres of flight.
-		var big: bool = def.size > 1.2
-		m.trail += m.speed * dt
-		var spacing := 4.0 if big else 5.0
-		while m.trail >= spacing:
-			m.trail -= spacing
-			vfx.trail(p1 - m.dir * m.trail, big)
+		_missile_trail(m, p0, p1, moved.length())
 		var hit: Target = null
 		if m.arm <= 0.0:
 			# Proximity fuse: once close to its own target, a guided missile only goes for it,
 			# so a turret's hull can't intercept a missile aimed at the turret.
 			if tgt != null and p1.distance_to(tgt.global_position) < tgt.radius + 40.0:
-				if Combat.seg_sphere(p0, p1, tgt.global_position, tgt.radius + 6.0):
+				# Area-effect missiles detonate as soon as the target is inside the blast.
+				var fuse: float = tgt.radius + (minf(def.radius * 0.3, 22.0) if def.has("radius") else 6.0)
+				if Combat.seg_sphere(p0, p1, tgt.global_position, fuse):
 					hit = tgt
 			else:
 				hit = first_hit(p0, p1, 3.0)

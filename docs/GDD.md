@@ -53,14 +53,18 @@ Source: `scripts/player/turbokat_model.gd` (all colours are constants at the top
 
 **Missiles (canon, from https://swatkats.info/entry-type/swat-kats-weapons/)**
 
-| Missile | Canon summary | Gameplay |
-|---|---|---|
-| Blowtorch (F) | High-explosive guided missile carried aboard the TurboKat | Lock-on homing missile, regenerates |
-| Octopus | Signature less-than-lethal missile that captures and restrains a target | Restrained gliders fall; turrets pinned for 8 s |
-| Buzz-Saw | Non-explosive spinning saw in a red casing with a shark decal; best against wings; fired as a barrage | One saw per locked target (up to 4); bonus vs gliders |
-| Scrambler | Million-megavolt discharge that disables electrical systems; lightning-bolt marking | Disables everything within 75 m for 6 s |
-| Slicer | Non-explosive bladed missile that penetrates targets | Damages armored targets (the warship hull before its turrets fall) |
-| Match Head | Explosive-incendiary missile with a match-like ball tip that ignites | Large blast that sets targets burning |
+| Missile | Canon summary | Gameplay | Flight / trail |
+|---|---|---|---|
+| Blowtorch (F) | High-explosive guided missile carried aboard the TurboKat | Lock-on homing missile, regenerates | Straight, white smoke |
+| Octopus | Signature less-than-lethal missile that captures and restrains a target | Restrained gliders fall; turrets pinned for 8 s | Swimming wave, pink ink |
+| Buzz-Saw | Non-explosive spinning saw in a red casing with a shark decal; best against wings; fired as a barrage | One saw per locked target (up to 4); bonus vs gliders | Corkscrew, sparks |
+| Scrambler | Million-megavolt discharge that disables electrical systems; lightning-bolt marking | Disables everything within 75 m for 6 s | Lightning zigzag, electric arcs |
+| Slicer | Non-explosive bladed missile that penetrates targets | Damages armored targets (the warship hull before its turrets fall) | Very fast and dead straight, laser beam |
+| Match Head | Explosive-incendiary missile with a match-like ball tip that ignites | Large blast that sets targets burning | Lobbed arc, fire |
+
+Firing a special shows a comic title card and (unless turned off in the pause menu) a missile cam:
+the launch in slow motion, the flight ramping back to full speed with the camera trailing on a
+spring so fast missiles visibly pull away, and a slow beat on the impact. Skippable with any fire button.
 
 Candidates for later episodes: Banshee (sonic, disrupts guidance), Megavolt, Mole (drilling),
 Pincer, Spider (needs a canon description), Decoy (countermeasure once enemies fire homing weapons),

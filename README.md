@@ -43,7 +43,11 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 - **Weapons:** twin cannons with overheat, Blowtorch homing missiles, and a rack of the show's
   special missiles (from the swatkats.info weapons catalogue): the **Octopus** (captures a target),
   **Buzz-Saw** (saw barrage, one per locked target), **Scrambler** (shorts out everything nearby),
-  **Slicer** (cuts through armor) and **Match Head** (incendiary blast).
+  **Slicer** (cuts through armor) and **Match Head** (incendiary blast). Each one flies its own
+  way with its own trail (Octopus swims on a pink ink wave, Buzz-Saw corkscrews in sparks,
+  Scrambler zigzags like lightning, Slicer streaks like a laser, Match Head lobs a fiery arc),
+  and firing one plays a short missile cam: a comic title card and a slow-motion chase shot that
+  holds on the impact. Skip it with any fire button, or turn it off in the pause menu.
 - **Cartoon effects:** banded toon fireballs that break up into chunky smoke, impact stars,
   shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on
   big kills. All pooled (no per-explosion allocations) to keep the web build smooth.

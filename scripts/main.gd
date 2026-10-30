@@ -7,6 +7,7 @@ extends Node
 ##   --seconds=<n>         quit the autotest after n seconds (default 150)
 ##   --shots=<dir>         save screenshots to <dir> during the autotest (needs a display)
 ##   --weapons             (with --autotest) fire each special missile at a target and report the result
+##   --mcam                (with --autotest) allow the missile-cam cutscene
 ##   --god                 invulnerable player with perfect aim (tests mission logic, not skill)
 ##   --snap=<file.png>     save a screenshot of the title screen after 4 s, then quit
 ##                         (add --intro to capture the launch cinematic, --snap-at=<s> to pick the moment)
@@ -121,6 +122,7 @@ func _build_world() -> void:
 	player.city = city
 	world.add_child(player)
 	player.destroyed.connect(_on_player_destroyed)
+	player.special_fired.connect(_on_special_fired)
 	camera = ChaseCamera.new()
 	camera.target = player
 	world.add_child(camera)
@@ -162,6 +164,7 @@ func spawn_boss(boss: Node3D) -> Node3D:
 
 
 func _clear_world() -> void:
+	_end_missile_cam()
 	combat.clear()
 	for n in get_tree().get_nodes_in_group("mission_spawn"):
 		n.queue_free()
@@ -171,7 +174,77 @@ func _clear_world() -> void:
 func hit_stop(real_seconds: float) -> void:
 	Engine.time_scale = 0.05
 	get_tree().create_timer(real_seconds, true, false, true).timeout.connect(func():
-		Engine.time_scale = 0.35 if _slowmo_until > Time.get_ticks_msec() else 1.0)
+		if not _mcam.is_empty():
+			Engine.time_scale = MCAM_SLOWMO
+		else:
+			Engine.time_scale = 0.35 if _slowmo_until > Time.get_ticks_msec() else 1.0)
+
+
+# --- missile cam ----------------------------------------------------------------------
+
+## Cinematic for special missiles: a chase camera on the missile with a title card. The launch
+## plays in slow motion, the flight ramps back to full speed so the missile reaches its target,
+## and the impact gets a slow beat before returning to the cockpit. Skippable with any fire button.
+const MCAM_SLOWMO := 0.3
+const MCAM_MAX := 3.4 # unscaled seconds
+const MCAM_LAG := 55.0 # furthest the camera falls behind a fast missile
+var _mcam := {}
+
+
+func _on_special_fired(missiles: Array, def: Dictionary) -> void:
+	hud.banner(def)
+	if not Game.missile_cam or (_autotest and not _opts.has("mcam")) or not _mcam.is_empty() or missiles.is_empty():
+		return
+	_mcam = {"m": missiles[0], "t": 0.0, "impact": -1.0, "last": player.global_position}
+	camera.shot = "script"
+	Engine.time_scale = MCAM_SLOWMO
+	player.grant_invulnerability(1.0)
+
+
+func _missile_cam_step(real_dt: float) -> void:
+	_mcam.t = float(_mcam.t) + real_dt
+	var elapsed: float = _mcam.t
+	var m: Dictionary = _mcam.m
+	var flying: bool = combat._missiles.has(m)
+	var skip := elapsed > 0.3 and (Input.is_action_just_pressed("fire_guns") or Input.is_action_just_pressed("fire_special") or Input.is_action_just_pressed("fire_missile"))
+	if flying:
+		# Aim at the missile's guide point (its smooth course) rather than the body, so the frame
+		# stays steady and the spiral / zigzag / wave plays out on screen.
+		var node: Node3D = m.node
+		# The lobbed arc leaves the guide point far below, so that one is framed on the body.
+		var base: Vector3 = node.global_position if m.def.get("path", "") == "arc" else m.base
+		var d: Vector3 = _mcam.get("dir", m.dir)
+		d = d.slerp(m.dir, 1.0 - exp(-real_dt * 5.0)).normalized()
+		_mcam.dir = d
+		var side := d.cross(Vector3.UP)
+		side = side.normalized() if side.length_squared() > 0.001 else Vector3.RIGHT
+		# The camera trails behind on a soft spring, so fast missiles visibly pull away from it
+		# (the Slicer streaks off, the Match Head lumbers), capped so the missile stays in shot.
+		var want := base - d * 9.0 + side * 8.0 + Vector3.UP * 4.0 # clear of the trail
+		var pos := want if elapsed < 0.05 else camera.global_position.lerp(want, 1.0 - exp(-real_dt * 3.0))
+		if pos.distance_to(want) > MCAM_LAG:
+			pos = want + (pos - want).normalized() * MCAM_LAG
+		camera.global_position = pos
+		camera.look_at(base + d * 4.0, Vector3.UP)
+		_mcam.last = node.global_position
+		Engine.time_scale = lerpf(MCAM_SLOWMO, 1.0, smoothstep(0.6, 1.5, elapsed))
+	else:
+		# Impact: hold on the blast for a beat.
+		if float(_mcam.impact) < 0.0:
+			_mcam.impact = elapsed
+			Engine.time_scale = MCAM_SLOWMO
+		camera.look_at(_mcam.last, Vector3.UP)
+	var impact_hold: bool = float(_mcam.impact) >= 0.0 and elapsed - float(_mcam.impact) > 0.8
+	if skip or impact_hold or elapsed > MCAM_MAX or not player.alive:
+		_end_missile_cam()
+
+
+func _end_missile_cam() -> void:
+	if _mcam.is_empty():
+		return
+	_mcam = {}
+	camera.shot = ""
+	Engine.time_scale = 0.35 if _slowmo_until > Time.get_ticks_msec() else 1.0
 
 
 func slow_motion(real_seconds: float) -> void:
@@ -286,6 +359,7 @@ func _show_debrief() -> void:
 
 
 func _pause() -> void:
+	_end_missile_cam()
 	state = State.PAUSED
 	get_tree().paused = true
 	Sfx.set_engine(false, 0, 0)
@@ -327,7 +401,7 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if _slowmo_until > 0 and Time.get_ticks_msec() > _slowmo_until:
 		_slowmo_until = 0
-		Engine.time_scale = 1.0
+		Engine.time_scale = MCAM_SLOWMO if not _mcam.is_empty() else 1.0
 
 	match state:
 		State.INTRO:
@@ -342,6 +416,8 @@ func _process(delta: float) -> void:
 				if _intro_t <= 0.0:
 					player.player_control = not _autotest
 					camera.shot = ""
+			if not _mcam.is_empty():
+				_missile_cam_step(delta / maxf(Engine.time_scale, 0.01))
 			if _autotest and _intro_t <= 0.0:
 				_autopilot_fight()
 			mission.step(delta)
@@ -661,6 +737,13 @@ func _weapon_test_step(delta: float) -> void:
 	var tname := best.display_name
 	var ref: WeakRef = weakref(best)
 	player._fire_special(def)
+	if _opts.has("shots"):
+		# Photograph the missile cam mid-flight.
+		for at in [0.15, 0.6, 1.2]:
+			get_tree().create_timer(at).timeout.connect(func():
+				var img := get_viewport().get_texture().get_image()
+				if img:
+					img.save_png("%s/mcam_%s_%d_%.2f.png" % [_opts.shots, def.id, _weapon_test_i, at]))
 	get_tree().create_timer(2.0).timeout.connect(func():
 		var tgt = ref.get_ref()
 		var state_txt: String = "destroyed" if tgt == null or not tgt.alive else "hp %d->%d stunned=%.1f burning=%.1f captured=%s" % [hp_before, tgt.hp, tgt.stunned, tgt.burn_t, tgt.captured]
