@@ -478,6 +478,31 @@ func _hangar_jet() -> void:
 			n.rotation_degrees = Vector3(-62, -150, 0)
 	get_viewport().transparent_bg = true
 	get_viewport().msaa_3d = Viewport.MSAA_4X
+	if _opts.get("jetpose", "") == "hero":
+		# In flight for the launch page: banked into a turn, seen from low at the front-left.
+		# The airframe is measured before the afterburner effects light up.
+		var hb := AABB()
+		var hfirst := true
+		for vi in player.find_children("*", "MeshInstance3D", true, false):
+			if (vi as VisualInstance3D).is_visible_in_tree():
+				var b: AABB = vi.global_transform * (vi as VisualInstance3D).get_aabb()
+				hb = b if hfirst else hb.merge(b)
+				hfirst = false
+		player.throttle = 1.0
+		player.boosting = true
+		player._effects(0.016)
+		player.global_transform.basis = Basis(Vector3.FORWARD, deg_to_rad(-24)) * Basis(Vector3.RIGHT, deg_to_rad(6))
+		var hl := hb.size.z
+		camera.shot = "script"
+		camera.fov = 24.0
+		camera.global_position = hb.get_center() + Vector3(-hl * 0.62, -hl * 0.15, -hl * 0.78)
+		camera.look_at(hb.get_center(), Vector3.UP)
+		for i in 4:
+			await get_tree().process_frame
+		get_viewport().get_texture().get_image().save_png(_opts.hangarjet)
+		print("[hangarjet] saved ", _opts.hangarjet)
+		get_tree().quit()
+		return
 	# Parked: landing gear (the flight model has none), sized from the airframe's bounds.
 	var box := AABB()
 	var first := true
