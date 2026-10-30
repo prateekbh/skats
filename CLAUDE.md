@@ -31,7 +31,13 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   their outputs): `convert_turbokat.py` (3D model and paint), `prepare_launch_art.py` (launch-screen
   cut-outs, portraits and the traced logo), `render_launch_art.py` (the launcher's TurboKat and
   city shots, rendered by the game with `--jetrender` / `--weaponshow`), `fetch_missile_art.py`
-  (HUD missile cards from the swatkats.info missile catalogue).
+  (HUD missile cards from the swatkats.info missile catalogue), `fetch_character_art.py`
+  (character portraits with expressions and cutscene panels from swatkats.info show frames).
+- Story is told with comic elements (`scripts/ui/comic.gd` shares the look): `RadioCard` on the HUD
+  (`Mission.radio(who, text, seconds, mood)`) and `ComicStrip` cutscenes between waves
+  (`Mission.cutscene(panels, then)`, game paused). New speakers or moods go in `Comic.SPEAKERS` and
+  `fetch_character_art.py`. Autotests skip cutscenes unless `--comic`; `--launch` starts an autotest
+  through the hatch launch.
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
   created per shot or per explosion. Effects go through the pooled `VFX` system
   (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.

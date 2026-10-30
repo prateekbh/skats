@@ -7,8 +7,11 @@ extends Node
 ##   --episode=<id>        episode to autotest (default ep01)
 ##   --seconds=<n>         quit the autotest after n seconds (default 150)
 ##   --shots=<dir>         save screenshots to <dir> during the autotest (needs a display)
+##   --shot-every=<s>      (with --shots) a screenshot every s seconds instead of the default moments
+##   --launch              (with --autotest) start through the hatch launch, as a player would
 ##   --weapons             (with --autotest) fire each special missile at a target and report the result
-##   --mcam                (with --autotest) allow the missile-cam cutscene
+##   --mcam                (with --autotest) allow the missile launch shot
+##   --comic               (with --autotest) allow the comic-strip cutscenes between waves
 ##   --god                 invulnerable player with perfect aim (tests mission logic, not skill)
 ##   --snap=<file.png>     save a screenshot of the title screen after 4 s, then quit
 ##                         (add --intro to capture the launch cinematic, --snap-at=<s> to pick the moment)
@@ -30,6 +33,7 @@ var player: TurboKat
 var camera: ChaseCamera
 var hud: Control
 var menu: Control
+var comic: ComicStrip
 var mission: Mission
 var episode: Dictionary
 
@@ -56,6 +60,13 @@ func _ready() -> void:
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_opts[kv[0]] = kv[1] if kv.size() > 1 else "true"
 	_autotest = _opts.has("autotest")
+	if _opts.has("shot-every"):
+		_shot_times.clear()
+		var every := float(_opts["shot-every"])
+		var t := every
+		while t < float(_opts.get("seconds", 150)):
+			_shot_times.append(t)
+			t += every
 	_build_world()
 	_build_ui()
 	if _opts.has("showcase"):
@@ -67,7 +78,11 @@ func _ready() -> void:
 	elif _opts.has("jetrender"):
 		_jet_render.call_deferred()
 	elif _autotest:
-		start_episode(Game.episode_by_id(_opts.get("episode", "ep01")))
+		var ep := Game.episode_by_id(_opts.get("episode", "ep01"))
+		if _opts.has("launch"):
+			launch_episode(ep)
+		else:
+			start_episode(ep)
 	elif _opts.has("snap") and _opts.has("intro"):
 		_start_intro()
 	else:
@@ -152,6 +167,24 @@ func _build_ui() -> void:
 	menu.resume.connect(_resume)
 	menu.restart.connect(func(): start_episode(episode))
 	menu.quit_to_title.connect(_show_title)
+	comic = ComicStrip.new()
+	layer.add_child(comic)
+
+
+## Plays a comic-strip cutscene with the game paused, then calls `then`. Autotests skip
+## it unless --comic is given.
+func show_comic(panels: Array, then: Callable) -> void:
+	if (_autotest and not _opts.has("comic")) or panels.is_empty():
+		then.call()
+		return
+	_end_missile_cam()
+	get_tree().paused = true
+	Sfx.set_engine(false, 0, 0)
+	comic.play(panels)
+	await comic.finished
+	if state == State.PLAYING:
+		get_tree().paused = false
+		then.call()
 
 
 func spawn_creepling(pos: Vector3, heavy: bool, anchor: Vector3) -> Creepling:
@@ -171,6 +204,7 @@ func spawn_boss(boss: Node3D) -> Node3D:
 func _clear_world() -> void:
 	_end_missile_cam()
 	combat.clear()
+	comic.cancel()
 	city.reset_damage() # the damage stays until the next stage starts
 	for n in get_tree().get_nodes_in_group("mission_spawn"):
 		n.queue_free()
@@ -267,23 +301,39 @@ func launch_episode(ep: Dictionary) -> void:
 	_start_intro()
 
 
-func start_episode(ep: Dictionary) -> void:
+## `from_launch`: straight out of the hatch launch, so the jet keeps flying where it is and the
+## player has the controls at once (no camera swing-in).
+func start_episode(ep: Dictionary, from_launch := false) -> void:
 	if ep.is_empty() or not ep.playable:
 		return
 	episode = ep
 	get_tree().paused = false
 	Engine.time_scale = 1.0
+	# A launch skipped while still in the tunnel starts from the mission's usual spot instead.
+	var keep := from_launch and player.global_position.y > 40.0
+	var at := player.global_position
+	var heading := player.forward()
+	var launch_speed := player.speed
 	_clear_world()
 	mission = load(ep.script).new()
 	mission.main = self
-	var pose: Array = mission.start_pose()
-	player.reset(pose[0], pose[1])
-	player.player_control = false
+	if keep:
+		player.reset(at, at + heading * 100.0)
+		player.speed = clampf(launch_speed, 130.0, 240.0)
+		player.throttle = 0.8
+	else:
+		var pose: Array = mission.start_pose()
+		player.reset(pose[0], pose[1])
+	player.player_control = keep and not _autotest
 	player.ai = {"pitch": 0.0, "roll": 0.0, "yaw": 0.0, "throttle": 0.6, "fire": false, "missile": false}
-	camera.shot = "intro"
-	camera.shot_time = 0.0
 	camera.mode = ChaseCamera.Mode.CHASE
-	_intro_t = 3.2
+	if keep:
+		camera.shot = ""
+		_intro_t = 0.0
+	else:
+		camera.shot = "intro"
+		camera.shot_time = 0.0
+		_intro_t = 3.2
 	_end_timer = -1.0
 	hud.reset()
 	hud.visible = true
@@ -360,6 +410,8 @@ func _show_debrief() -> void:
 
 
 func _pause() -> void:
+	if comic.is_active():
+		return
 	_end_missile_cam()
 	state = State.PAUSED
 	get_tree().paused = true
@@ -544,6 +596,7 @@ const INTRO_EMERGE := 1.9 # seconds until the nose clears the hatch
 const INTRO_CLIMB_DEG := 32.0 # launch angle out of the tunnel
 const INTRO_EXIT_SPEED := 120.0 # m/s at the hatch
 const INTRO_ACCEL := 45.0 # m/s² after emerging
+const INTRO_HANDOVER := 3.0 # seconds after emerging when the player takes the controls
 
 
 func _intro_step(delta: float) -> void:
@@ -577,7 +630,6 @@ func _intro_step(delta: float) -> void:
 	_intro_once("launch", INTRO_EMERGE - 0.05, func():
 		camera.add_shake(1.8)
 		combat.vfx.dust(hatch, 1.4))
-	_intro_once("logo", INTRO_EMERGE + 2.4, menu.slam_logo)
 
 	# Camera: low on the yard floor watching the hatch, then swinging in behind the climb.
 	# The crane stands on the other side of the yard, so the camera sits on this side, above the junk.
@@ -590,7 +642,8 @@ func _intro_step(delta: float) -> void:
 	camera.look_at(target, Vector3.UP)
 
 	player._effects(delta)
-	if t > INTRO_EMERGE + 6.0:
+	# Hand over as soon as the camera has settled behind the climbing jet.
+	if t > INTRO_EMERGE + INTRO_HANDOVER:
 		_finish_intro()
 
 
@@ -611,7 +664,7 @@ func _finish_intro() -> void:
 	if not _launch_ep.is_empty():
 		var ep := _launch_ep
 		_launch_ep = {}
-		start_episode(ep)
+		start_episode(ep, true)
 	else:
 		_show_title()
 

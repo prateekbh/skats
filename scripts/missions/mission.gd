@@ -43,8 +43,15 @@ func after(seconds: float, cb: Callable) -> void:
 	_timers.append({"t": seconds, "cb": cb})
 
 
-func radio(who: String, text: String, seconds := 4.5) -> void:
-	main.hud.radio(who, text, seconds)
+## A radio line on the HUD's comic card; `mood` picks the speaker's expression
+## (assets/ui/portraits/<character>_<mood>.png, see Comic.SPEAKERS).
+func radio(who: String, text: String, seconds := 4.5, mood := "") -> void:
+	main.hud.radio(who, text, seconds, mood)
+
+
+## A comic-strip cutscene (game paused), then `then`. Panels: see ComicStrip.
+func cutscene(panels: Array, then: Callable) -> void:
+	main.show_comic(panels, then)
 
 
 func message(text: String, seconds := 2.5) -> void:

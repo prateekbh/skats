@@ -14,9 +14,7 @@ var font: Font
 var _objective: Label
 var _score: Label
 var _center: Label
-var _radio_box: PanelContainer
-var _radio_who: Label
-var _radio_text: Label
+var _radio_card: RadioCard
 var _radio_queue: Array = []
 var _radio_t := 0.0
 var _center_t := 0.0
@@ -49,24 +47,9 @@ func _ready() -> void:
 	_center.add_theme_color_override("font_outline_color", Color.BLACK)
 	_center.add_theme_constant_override("outline_size", 8)
 
-	_radio_box = PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.03, 0.05, 0.08, 0.72)
-	sb.border_color = GREEN_DIM
-	sb.set_border_width_all(1)
-	sb.border_width_left = 4
-	sb.set_content_margin_all(10)
-	_radio_box.add_theme_stylebox_override("panel", sb)
-	_radio_box.position = Vector2(20, 56)
-	_radio_box.custom_minimum_size = Vector2(430, 0)
-	add_child(_radio_box)
-	var vb := VBoxContainer.new()
-	_radio_box.add_child(vb)
-	_radio_who = _label(15, AMBER, HORIZONTAL_ALIGNMENT_LEFT, vb)
-	_radio_text = _label(18, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, vb)
-	_radio_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_radio_text.custom_minimum_size = Vector2(410, 0)
-	_radio_box.visible = false
+	_radio_card = RadioCard.new()
+	_radio_card.position = Vector2(18, 58)
+	add_child(_radio_card)
 
 
 ## Anchors a control to a preset, then sets its offsets from those anchors.
@@ -91,7 +74,7 @@ func _label(size: int, color: Color, align: HorizontalAlignment, parent: Node = 
 func reset() -> void:
 	_radio_queue.clear()
 	_radio_t = 0.0
-	_radio_box.visible = false
+	_radio_card.clear()
 	_center.text = ""
 	_damage = 0.0
 	_rack_index = 0
@@ -99,8 +82,9 @@ func reset() -> void:
 	_rack_pos = 0.0
 
 
-func radio(who: String, text: String, seconds: float) -> void:
-	_radio_queue.append([who, text, seconds])
+## Queues a radio line; `mood` picks the speaker's expression (see Comic.SPEAKERS).
+func radio(who: String, text: String, seconds: float, mood := "") -> void:
+	_radio_queue.append([who, text, seconds, mood])
 
 
 func message(text: String, seconds := 2.5) -> void:
@@ -158,17 +142,16 @@ func _process(delta: float) -> void:
 	_radio_t -= delta
 	if _radio_t <= 0.0:
 		if _radio_queue.is_empty():
-			_radio_box.visible = false
+			_radio_card.dismiss()
 		else:
 			var r = _radio_queue.pop_front()
-			_radio_who.text = "◢ " + str(r[0]).to_upper()
-			_radio_text.text = r[1]
-			_radio_t = r[2]
-			_radio_box.visible = true
+			_radio_card.present(r[0], r[1], r[3])
+			_radio_t = r[2] + 1.0 # a beat longer than before: the card is there to be read
 			Sfx.play("beep", -18.0, 0.6)
 	_center_t -= delta
 	_center.modulate.a = clampf(_center_t * 2.0, 0.0, 1.0)
 	_damage = maxf(0.0, _damage - delta * 2.0)
+	_radio_card.scale = Vector2.ONE * clampf(size.x / 1280.0, 0.75, 1.6)
 	if main and main.player:
 		# Slide the carousel forward to the selected missile, in real time.
 		var n := Arsenal.SPECIALS.size()

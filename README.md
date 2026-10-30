@@ -63,6 +63,10 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 - **Megakat City:** procedural downtown with lit windows, street lamps, Enforcer HQ, City Hall, the bay, and the salvage yard where the hidden hangar is.
 - **Episode 1, *Dark Skies Over Megakat*:** two Creepling waves, then Dark Kat's warship (destroy the turrets, then the hull). Original radio dialogue for Razor, T-Bone, Callie, Feral and Dark Kat.
 - **Free Flight:** endless escalating waves for score attack.
+- **Story:** radio chatter arrives as comic cards with the speaker's portrait and an expression for
+  the line, and between waves the game pauses for comic-strip story beats from Commander Feral,
+  Lt. Felina Feral, Mayor Manx and Deputy Mayor Callie Briggs (and Dark Kat). After the hatch launch
+  the player has the controls straight away.
 - **Presentation:** HUD with radar, lock-on and warnings; briefing and debrief screens with ranks and saved best scores; all sound effects synthesized at runtime.
 
 See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan and roadmap.
@@ -74,6 +78,11 @@ See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan 
 - Character art and logo on the launch screen: SWAT Kats artwork © Hanna-Barbera / Warner Bros.
   Discovery, used in this non-commercial fan project. The T-Bone and Razor poster is fan art signed
   "Feno 2011". Processed by `tools/prepare_launch_art.py` (cut-outs, traced vector logo).
+- Character portraits and cutscene panels: SWAT Kats show frames from the swatkats.info character
+  entries, © Hanna-Barbera / Warner Bros. Discovery, used in this non-commercial fan project
+  (`tools/fetch_character_art.py`).
+- Fonts: Bangers (Vernon Adams) and Comic Neue (Craig Rozynski), SIL Open Font License
+  (`assets/fonts/`).
 
 - TurboKat 3D model: "TurboKat from Swat Kats Fixed STL" by RabbitXGT
   (https://www.thingiverse.com/thing:4500382), based on Captain_Ahab_62's model, CC BY.
