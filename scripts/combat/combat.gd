@@ -8,6 +8,9 @@ signal target_killed(target: Target)
 const MAX_BULLETS := 600
 const PLAYER_TEAM := 0
 const ENEMY_TEAM := 1
+const PieceShader := preload("res://shaders/cut_piece.gdshader")
+const PIECE_POOL := 16
+const PIECE_LIFE := 7.0
 
 var player: TurboKat
 var city: City
@@ -29,6 +32,9 @@ var _missile_pools := {}
 ## Octopus Missile tentacle rigs: reusable, and the ones currently holding a captive.
 var _tentacle_pool: Array[Node3D] = []
 var _captures: Array[Dictionary] = []
+## Cut-apart debris (Slicer / Buzz-Saw kills): reusable piece rigs and the ones in flight.
+var _piece_pool: Array[Dictionary] = []
+var _pieces: Array[Dictionary] = []
 ## Pooled cartoon effects (explosions, hit stars, smoke trails).
 var vfx: VFX
 var _armor_ping_cd := 0.0
@@ -43,6 +49,8 @@ func _ready() -> void:
 	_enemy_mm = _make_tracer_mm(Color(1.0, 0.25, 0.2), Vector3(0.9, 0.9, 4.5))
 	vfx = VFX.new()
 	add_child(vfx)
+	for k in PIECE_POOL:
+		_piece_pool.append(_build_piece())
 
 
 func _make_tracer_mm(color: Color, size: Vector3) -> MultiMesh:
@@ -143,6 +151,10 @@ func clear() -> void:
 		c.rig.visible = false
 		_tentacle_pool.append(c.rig)
 	_captures.clear()
+	for pc in _pieces:
+		pc.root.visible = false
+		_piece_pool.append(pc)
+	_pieces.clear()
 	vfx.clear()
 	for p in _pickups:
 		if is_instance_valid(p):
@@ -168,6 +180,7 @@ func _process(delta: float) -> void:
 	_update_bullets(delta)
 	_update_missiles(delta)
 	_update_captures(delta)
+	_update_pieces(delta)
 	_update_pickups(delta)
 	_prune_targets()
 
@@ -420,14 +433,38 @@ func _update_missiles(dt: float) -> void:
 					hit = tgt
 			else:
 				hit = first_hit(p0, p1, 3.0)
-		if hit or p1.y < city.height_at(p1.x, p1.z) or m.life <= 0.0:
+		var struck := hit == null and p1.y < city.height_at(p1.x, p1.z)
+		if hit or struck or m.life <= 0.0:
+			if struck:
+				p1 = _surface_point(p0, p1)
 			_missile_hit(def, p1, hit)
 			_recycle_missile(m)
 			_missiles.remove_at(i)
 
 
+## Where the segment a (outside) → b (inside a building or the ground) crosses the surface.
+func _surface_point(a: Vector3, b: Vector3) -> Vector3:
+	for k in 10:
+		var mid := (a + b) * 0.5
+		if mid.y < city.height_at(mid.x, mid.z):
+			b = mid
+		else:
+			a = mid
+	return (a + b) * 0.5
+
+
+## How hard each missile type hits a building (0 = no structural damage).
+const BUILDING_DAMAGE := {"homing": 1.0, "blast": 1.8, "pierce": 0.9, "barrage": 0.7}
+
+
 ## Applies a missile's effect where it detonated. `hit` is null for ground or timeout.
 func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
+	if hit == null and city:
+		var power: float = BUILDING_DAMAGE.get(def.behaviour, 0.0)
+		if power > 0.0:
+			var smoke := city.damage_at(p, power)
+			if smoke != Vector3.INF:
+				vfx.add_smoke_column(smoke, clampf(power, 0.8, 1.5))
 	match def.behaviour:
 		"capture":
 			# Octopus: restrain the target. A captured glider loses lift and falls.
@@ -439,11 +476,12 @@ func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
 				hit.captured = true
 				_attach_tentacles(hit, def)
 		"barrage":
-			# Buzz-Saw: non-explosive cut, extra effective against wings.
-			vfx.hit(p, 1.8)
+			# Buzz-Saw: non-explosive cut, extra effective against wings; a kill saws the
+			# target in two (Combat.cut_apart).
+			vfx.cut(p, 1.0)
 			if hit:
 				var mult: float = def.wing_bonus if hit is Creepling else 1.0
-				hit.take_damage(def.damage * mult, p)
+				_cut_damage(hit, def.damage * mult, p, false, def.get("pieces", 2))
 		"scramble":
 			# Scrambler: a million-megavolt discharge shorts out everything nearby.
 			vfx.electric(p, def.radius)
@@ -454,10 +492,10 @@ func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
 					t.take_damage(def.damage, t.global_position)
 					t.stun(def.disable)
 		"pierce":
-			# Slicer: cuts through armor.
-			explode(p, 1.1)
+			# Slicer: cuts through armor; a kill slices the target into pieces.
+			vfx.cut(p, 1.2)
 			if hit:
-				hit.take_damage(def.damage, p, true)
+				_cut_damage(hit, def.damage, p, true, def.get("pieces", 5))
 		"blast":
 			# Match Head: explosive-incendiary.
 			explode(p, 3.2)
@@ -471,6 +509,15 @@ func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
 			explode(p, 1.2)
 			if hit:
 				hit.take_damage(def.damage, p)
+
+
+## Damage from a cutting missile: if it kills a cuttable target, the kill cuts it apart.
+func _cut_damage(t: Target, amount: float, p: Vector3, pierce: bool, pieces: int) -> void:
+	if t.cuttable:
+		t.cut_pieces = pieces
+	t.take_damage(amount, p, pierce)
+	if t.alive:
+		t.cut_pieces = 0
 
 
 # --- Octopus tentacle rigs (pooled, follow their captive) ------------------------------
@@ -507,6 +554,112 @@ func _update_captures(dt: float) -> void:
 			continue
 		rig.global_position = t.global_position
 		rig.rotation = Vector3(0, c.t * 1.5, sin(c.t * 4.0) * 0.2)
+
+
+# --- cut-apart debris (pooled piece rigs, see shaders/cut_piece.gdshader) ---------------
+
+## A rig that can draw any slab of a Creepling: a pivot (moved and spun as the piece flies) holding
+## the model parts, offset so the pivot sits at the piece's centre.
+func _build_piece() -> Dictionary:
+	var root := Node3D.new()
+	root.visible = false
+	add_child(root)
+	var inner := Node3D.new()
+	root.add_child(inner)
+	var mats: Array[ShaderMaterial] = []
+	for part in Creepling.model_parts():
+		var mat := ShaderMaterial.new()
+		mat.shader = PieceShader
+		mat.set_shader_parameter("albedo", part.color)
+		mat.set_shader_parameter("metal", part.get("metal", 0.2))
+		mat.set_shader_parameter("rough", part.get("rough", 0.55))
+		mat.set_shader_parameter("glow", part.glow)
+		mat.set_shader_parameter("part_xform", Projection(Transform3D(Basis.from_scale(part.scl), part.pos)))
+		var mi := MeshKit.part(inner, part.mesh, mat, part.pos, Vector3.ZERO, part.scl)
+		mi.visible = not part.get("engine", false) # the engine glow dies with the Creepling
+		mats.append(mat)
+	return {"root": root, "inner": inner, "mats": mats, "vel": Vector3.ZERO, "spin": Vector3.ZERO, "t": 0.0, "fx": 0.0}
+
+
+## Cuts a dead target into `t.cut_pieces` slabs along parallel planes at a random angle (the
+## Slicer's five, the Buzz-Saw's two) and throws them apart, sparking and smoking. No explosion.
+func cut_apart(t: Target) -> void:
+	var model := t.model_root()
+	var count := maxi(t.cut_pieces, 2)
+	if model == null:
+		explode(t.global_position, 1.0)
+		return
+	var xf := model.global_transform
+	var src := model.get_children()
+	var a := randf() * TAU
+	var nrm := Vector3(cos(a), randf_range(-0.35, 0.35), sin(a)).normalized()
+	var e := t.cut_extent()
+	var ext := absf(nrm.x) * e.x + absf(nrm.y) * e.y + absf(nrm.z) * e.z
+	var cuts: Array[float] = []
+	if count == 2:
+		cuts.append(randf_range(-0.3, 0.3) * ext)
+	else:
+		for k in range(1, count):
+			cuts.append(lerpf(-ext, ext, float(k) / count) + randf_range(-0.2, 0.2) * ext / count)
+	var world_n := (xf.basis * nrm).normalized()
+	for k in count:
+		var lo := -1000.0 if k == 0 else cuts[k - 1]
+		var hi := 1000.0 if k == count - 1 else cuts[k]
+		var pc: Dictionary
+		if not _piece_pool.is_empty():
+			pc = _piece_pool.pop_back()
+		else:
+			pc = _pieces.pop_front()
+		var centre := nrm * (clampf(lo, -ext, ext) + clampf(hi, -ext, ext)) * 0.5
+		var root: Node3D = pc.root
+		root.global_transform = Transform3D(xf.basis, xf * centre)
+		pc.inner.position = -centre
+		var mats: Array = pc.mats
+		for i in mats.size():
+			var m: ShaderMaterial = mats[i]
+			m.set_shader_parameter("cut_n", nrm)
+			m.set_shader_parameter("cut_lo", lo)
+			m.set_shader_parameter("cut_hi", hi)
+			m.set_shader_parameter("heat", 1.0)
+			if i < src.size() and src[i] is MeshInstance3D and src[i].material_override is BaseMaterial3D:
+				m.set_shader_parameter("albedo", src[i].material_override.albedo_color)
+		var side := float(k) - (count - 1) * 0.5
+		pc.vel = t.velocity * 0.7 + world_n * side * randf_range(9.0, 15.0) + VFX._rand_dir() * 4.0 + Vector3.UP * 4.0
+		pc.spin = VFX._rand_dir() * randf_range(1.5, 4.5)
+		pc.t = 0.0
+		pc.fx = 0.0
+		root.visible = true
+		_pieces.append(pc)
+	vfx.cut(t.global_position, 1.0 + 0.25 * count)
+	if camera:
+		Sfx.play_at("armor", t.global_position, camera.global_position, 6.0, 0.55)
+		Sfx.play_at("hit", t.global_position, camera.global_position, 2.0, 0.7)
+
+
+func _update_pieces(dt: float) -> void:
+	for i in range(_pieces.size() - 1, -1, -1):
+		var pc := _pieces[i]
+		var root: Node3D = pc.root
+		pc.t += dt
+		pc.vel = pc.vel * maxf(0.0, 1.0 - 0.25 * dt) + Vector3.DOWN * 32.0 * dt
+		root.global_position += pc.vel * dt
+		var spin: Vector3 = pc.spin
+		root.global_basis = (Basis(spin.normalized(), spin.length() * dt) * root.global_basis).orthonormalized()
+		var heat := clampf(1.0 - pc.t / 3.5, 0.0, 1.0)
+		for m in pc.mats:
+			m.set_shader_parameter("heat", heat)
+		pc.fx -= dt
+		if pc.fx <= 0.0:
+			pc.fx = 0.06
+			vfx.cut_smoke(root.global_position, heat)
+		var p := root.global_position
+		var landed := p.y < city.height_at(p.x, p.z) + 0.5
+		if landed or pc.t > PIECE_LIFE:
+			if landed:
+				vfx.dust(p, 0.35)
+			root.visible = false
+			_pieces.remove_at(i)
+			_piece_pool.append(pc)
 
 
 # --- effects (drawn by the pooled VFX system) -----------------------------------------

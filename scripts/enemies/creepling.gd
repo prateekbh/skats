@@ -50,6 +50,7 @@ func setup(pos: Vector3, is_heavy: bool, anchor_point: Vector3) -> void:
 		radius = 6.0
 		speed = randf_range(95.0, 115.0)
 		score = 100
+	cuttable = true
 	_model = _build_model()
 	tree_exiting.connect(_release_token)
 	died.connect(func(_t): _release_token())
@@ -64,24 +65,58 @@ func _release_token() -> void:
 func _build_model() -> Node3D:
 	var root := Node3D.new()
 	add_child(root)
-	var s := 2.0 if heavy else 1.0
-	root.scale = Vector3.ONE * s
-	var hull := flashable(MeshKit.toon(Color(0.3, 0.16, 0.38) if not heavy else Color(0.22, 0.1, 0.12), 0.3, 0.5))
-	var wing_mat := flashable(MeshKit.toon(Color(0.14, 0.09, 0.2), 0.2, 0.6))
-	MeshKit.part(root, MeshKit.sphere(1.0, 12), hull, Vector3.ZERO, Vector3.ZERO, Vector3(1.4, 1.0, 3.0))
+	root.scale = Vector3.ONE * (2.0 if heavy else 1.0)
+	for part in Creepling.model_parts():
+		var mat: StandardMaterial3D
+		if part.glow:
+			mat = MeshKit.glow(part.color, part.get("add", false))
+		else:
+			mat = MeshKit.toon(part.color if not heavy or not part.has("heavy") else part.heavy, part.metal, part.rough)
+			if part.get("flash", false):
+				mat = flashable(mat)
+		MeshKit.part(root, part.mesh, mat, part.pos, Vector3.ZERO, part.scl)
+	return root
+
+
+## The Creepling's parts (unscaled; bombers are the same shape at twice the size). Shared by the
+## live model and the pooled cut-apart debris in Combat.
+static func model_parts() -> Array[Dictionary]:
+	if not _parts.is_empty():
+		return _parts
 	# Scalloped bat wings.
 	var wing := PackedVector2Array([
 		Vector2(0, -1.5), Vector2(3.0, -0.8), Vector2(7.5, 0.2), Vector2(6.0, 1.6), Vector2(4.5, 1.0),
 		Vector2(3.0, 2.2), Vector2(0, 1.6), Vector2(-3.0, 2.2), Vector2(-4.5, 1.0), Vector2(-6.0, 1.6),
 		Vector2(-7.5, 0.2), Vector2(-3.0, -0.8),
 	])
-	MeshKit.part(root, MeshKit.slab(wing, 0.25), wing_mat, Vector3(0, 0.2, 0.5))
-	# The Creepling pilot and its glowing eyes.
-	MeshKit.part(root, MeshKit.sphere(0.75, 10), MeshKit.toon(Color(0.45, 0.55, 0.3)), Vector3(0, 0.9, -0.6))
+	var parts: Array[Dictionary] = [
+		{"mesh": MeshKit.sphere(1.0, 12), "color": Color(0.3, 0.16, 0.38), "heavy": Color(0.22, 0.1, 0.12), "metal": 0.3, "rough": 0.5,
+			"glow": false, "flash": true, "pos": Vector3.ZERO, "scl": Vector3(1.4, 1.0, 3.0)},
+		{"mesh": MeshKit.slab(wing, 0.25), "color": Color(0.14, 0.09, 0.2), "metal": 0.2, "rough": 0.6,
+			"glow": false, "flash": true, "pos": Vector3(0, 0.2, 0.5), "scl": Vector3.ONE},
+		# The Creepling pilot and its glowing eyes.
+		{"mesh": MeshKit.sphere(0.75, 10), "color": Color(0.45, 0.55, 0.3), "metal": 0.2, "rough": 0.55,
+			"glow": false, "pos": Vector3(0, 0.9, -0.6), "scl": Vector3.ONE},
+	]
 	for sx in [-1.0, 1.0]:
-		MeshKit.part(root, MeshKit.sphere(0.2, 6), MeshKit.glow(Color(1.0, 0.15, 0.1)), Vector3(0.28 * sx, 1.05, -1.25))
-	MeshKit.part(root, MeshKit.sphere(0.6, 8), MeshKit.glow(Color(0.7, 0.3, 1.0, 0.9), true), Vector3(0, 0, 3.0))
-	return root
+		parts.append({"mesh": MeshKit.sphere(0.2, 6), "color": Color(1.0, 0.15, 0.1), "glow": true,
+			"pos": Vector3(0.28 * sx, 1.05, -1.25), "scl": Vector3.ONE})
+	parts.append({"mesh": MeshKit.sphere(0.6, 8), "color": Color(0.7, 0.3, 1.0, 0.9), "glow": true, "add": true,
+		"engine": true, "pos": Vector3(0, 0, 3.0), "scl": Vector3.ONE})
+	_parts = parts
+	return parts
+
+
+static var _parts: Array[Dictionary] = []
+
+
+## Half-extents of the unscaled model, for placing cuts across it.
+func cut_extent() -> Vector3:
+	return Vector3(7.5, 1.5, 3.2)
+
+
+func model_root() -> Node3D:
+	return _model
 
 
 ## Stunned: lose lift and tumble.

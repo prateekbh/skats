@@ -10,9 +10,10 @@ extends RefCounted
 ## Behaviours implemented in Combat._missile_hit / TurboKat._fire_special:
 ##   "homing"  guided high explosive
 ##   "capture" restrains the target: gliders fall out of the sky, turrets are pinned
-##   "barrage" fires one missile per locked target (up to `volley`), non-explosive saw hits
+##   "barrage" fires one missile per locked target (up to `volley`), non-explosive saw hits;
+##             a kill saws the target in two (`pieces`)
 ##   "scramble" electrical discharge that disables every target within `radius`
-##   "pierce"  damages armored targets too
+##   "pierce"  damages armored targets too; a kill slices the target into `pieces`, no explosion
 ##   "blast"   explosion that damages everything within `radius` and sets targets burning
 ##
 ## Each missile also flies its own way so it can be told apart at a glance:
@@ -45,7 +46,7 @@ const SPECIALS: Array[Dictionary] = [
 		"id": "buzzsaw", "name": "Buzz-Saw Missile", "behaviour": "barrage", "model": "buzzsaw",
 		"path": "spiral", "trail": "sparks",
 		"blurb": "Saw barrage, one per locked target",
-		"ammo": 3, "max": 5, "volley": 4, "damage": 110.0, "wing_bonus": 1.6,
+		"ammo": 3, "max": 5, "volley": 4, "damage": 110.0, "wing_bonus": 1.6, "pieces": 2,
 		"color": Color(0.85, 0.12, 0.1), "size": 1.0, "speed": 520.0, "turn": 3.0,
 	},
 	{
@@ -63,7 +64,7 @@ const SPECIALS: Array[Dictionary] = [
 		"id": "slicer", "name": "Slicer Missile", "behaviour": "pierce", "model": "slicer",
 		"path": "laser", "trail": "beam",
 		"blurb": "Cuts through armor",
-		"ammo": 3, "max": 4, "damage": 260.0,
+		"ammo": 3, "max": 4, "damage": 260.0, "pieces": 5,
 		"color": Color(0.75, 0.78, 0.85), "size": 1.2, "speed": 950.0, "turn": 4.0,
 	},
 	{

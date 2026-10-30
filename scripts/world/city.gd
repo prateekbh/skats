@@ -27,6 +27,19 @@ var _hw := PackedFloat32Array()
 var _hd := PackedFloat32Array()
 var _instance := PackedInt32Array()
 var _mm: MultiMesh
+## Missile damage, kept until reset_damage() at the start of the next stage: the original
+## building transforms and heights, each cell's setback tier and current block height, and the
+## rubble piled on broken roofs.
+var _xf0: Array[Transform3D] = []
+var _seed0 := PackedFloat32Array()
+var _color0: Array[Color] = []
+var _height0 := PackedFloat32Array()
+var _block_h := PackedFloat32Array()
+var _tier := PackedInt32Array()
+var _tier_broken := {}
+var _rubble_mm: MultiMesh
+var _rubble_n := 0
+const RUBBLE_MAX := 400
 
 
 func _ready() -> void:
@@ -40,11 +53,16 @@ func _ready() -> void:
 	_height.fill(0.0)
 	_instance.resize(cells)
 	_instance.fill(-1)
+	_block_h.resize(cells)
+	_block_h.fill(0.0)
+	_tier.resize(cells)
+	_tier.fill(-1)
 	_build_ground()
 	_build_buildings()
 	_build_landmarks()
 	_build_salvage_yard()
 	_build_mountains()
+	_height0 = _height.duplicate()
 
 
 ## Slides the hatch doors: 0 = closed, 1 = fully open.
@@ -85,9 +103,94 @@ func collapse_at(x: float, z: float) -> bool:
 	var w := _hw[c] * 2.0
 	var d := _hd[c] * 2.0
 	_height[c] = 6.0
+	_block_h[c] = 6.0
 	_mm.set_instance_transform(_instance[c], Transform3D(Basis.from_scale(Vector3(w, 6.0, d)), Vector3(_cx[c], 3.0, _cz[c])))
 	_mm.set_instance_color(_instance[c], Color(0.35, 0.3, 0.28))
 	return true
+
+
+## A missile struck a building at `p` (on its surface). Hits near the top knock the roof down and
+## pile rubble on it, or snap the setback tier on a tower so it leans over; hits lower down blast
+## a burning hole in the wall. Every hit leaves scorching (drawn by building.gdshader) and returns
+## where the smoke column should rise, or Vector3.INF if there was no building there.
+func damage_at(p: Vector3, power := 1.0) -> Vector3:
+	var c := cell_index(p.x, p.z)
+	if c < 0 or _instance[c] < 0:
+		return Vector3.INF
+	if absf(p.x - _cx[c]) > _hw[c] + 3.0 or absf(p.z - _cz[c]) > _hd[c] + 3.0:
+		return Vector3.INF
+	var inst := _instance[c]
+	var tier := _tier[c]
+	var bh := _block_h[c]
+	var smoke := p
+	var scorched := inst
+	if tier >= 0 and p.y > bh - 4.0:
+		scorched = tier
+		if not _tier_broken.has(c):
+			# The tier snaps at its base and leans over, sagging into the roof.
+			_tier_broken[c] = true
+			var xf := _mm.get_instance_transform(tier)
+			var th := xf.basis.get_scale().y
+			var axis := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+			var rot := Basis(axis, deg_to_rad(randf_range(9.0, 16.0)))
+			var base := Vector3(xf.origin.x, bh - 3.0, xf.origin.z)
+			_mm.set_instance_transform(tier, Transform3D(rot * xf.basis, base + rot * Vector3(0, th * 0.5, 0)))
+			_height[c] = bh + th * 0.9
+		_add_rubble(c, bh, 3)
+		smoke = Vector3(p.x, maxf(p.y, bh), p.z)
+	elif p.y > bh - 22.0 * power or bh < 45.0:
+		# Roof hit: knock the top floors off.
+		var chunk := minf(randf_range(10.0, 20.0) * power, bh - 12.0)
+		if chunk > 2.0:
+			bh -= chunk
+			_block_h[c] = bh
+			var xf := _mm.get_instance_transform(inst)
+			var sc := xf.basis.get_scale()
+			_mm.set_instance_transform(inst, Transform3D(Basis.from_scale(Vector3(sc.x, bh, sc.z)), Vector3(xf.origin.x, bh * 0.5, xf.origin.z)))
+			_height[c] -= chunk
+			if tier >= 0:
+				var txf := _mm.get_instance_transform(tier)
+				txf.origin.y -= chunk
+				_mm.set_instance_transform(tier, txf)
+		_add_rubble(c, bh, 5)
+		var col := _mm.get_instance_color(inst)
+		col.a = 0.0 # broken roof: building.gdshader chars the top floors
+		_mm.set_instance_color(inst, col)
+		smoke = Vector3(clampf(p.x, _cx[c] - _hw[c], _cx[c] + _hw[c]), bh, clampf(p.z, _cz[c] - _hd[c], _cz[c] + _hd[c]))
+	var cx := _cx[c]
+	var cz := _cz[c]
+	_mm.set_instance_custom_data(scorched, Color(_seed0[scorched], maxf(smoke.y, 1.0),
+		clampf((smoke.x - cx) / _hw[c], -1.2, 1.2), clampf((smoke.z - cz) / _hd[c], -1.2, 1.2)))
+	return smoke
+
+
+## Broken slabs of concrete heaped on a damaged roof, some tipped over the edge.
+func _add_rubble(c: int, roof: float, count: int) -> void:
+	for k in count:
+		var size := Vector3(randf_range(7.0, 16.0), randf_range(2.5, 6.0), randf_range(6.0, 14.0))
+		var at := Vector3(_cx[c] + randf_range(-0.8, 0.8) * _hw[c], roof + size.y * 0.3, _cz[c] + randf_range(-0.8, 0.8) * _hd[c])
+		var rot := Basis.from_euler(Vector3(randf_range(-0.6, 0.6), randf() * TAU, randf_range(-0.6, 0.6)))
+		var i := _rubble_n % RUBBLE_MAX
+		_rubble_mm.set_instance_transform(i, Transform3D(rot * Basis.from_scale(size), at))
+		var g := randf_range(0.3, 0.48)
+		_rubble_mm.set_instance_color(i, Color(g, g * 0.95, g * 0.9))
+		_rubble_n += 1
+	_rubble_mm.visible_instance_count = mini(_rubble_n, RUBBLE_MAX)
+
+
+## Undoes all missile damage (called when a stage starts).
+func reset_damage() -> void:
+	for k in _xf0.size():
+		_mm.set_instance_transform(k, _xf0[k])
+		_mm.set_instance_custom_data(k, Color(_seed0[k], 0, 0, 0))
+		_mm.set_instance_color(k, _color0[k])
+	_height = _height0.duplicate()
+	for c in _instance.size():
+		if _instance[c] >= 0:
+			_block_h[c] = _xf0[_instance[c]].basis.get_scale().y
+	_tier_broken.clear()
+	_rubble_n = 0
+	_rubble_mm.visible_instance_count = 0
 
 
 func _set_cell(c: int, center: Vector3, w: float, d: float, h: float) -> void:
@@ -145,8 +248,10 @@ func _build_buildings() -> void:
 			seeds.append(rng.randf())
 			cell_for.append(c)
 			# Setback tier on tall towers, for a stepped art-deco skyline.
+			_block_h[c] = h
 			if h > 140.0:
 				var th := rng.randf_range(25.0, 70.0)
+				_tier[c] = xforms.size()
 				xforms.append(Transform3D(Basis.from_scale(Vector3(w * 0.6, th, d * 0.6)), center + Vector3(0, h + th * 0.5, 0)))
 				colors.append(colors[colors.size() - 1])
 				seeds.append(rng.randf())
@@ -170,6 +275,23 @@ func _build_buildings() -> void:
 	bm.shader = BuildingShader
 	mmi.material_override = bm
 	add_child(mmi)
+	_xf0 = xforms.duplicate()
+	_seed0 = PackedFloat32Array(seeds)
+	_color0 = colors.duplicate()
+
+	_rubble_mm = MultiMesh.new()
+	_rubble_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_rubble_mm.use_colors = true
+	_rubble_mm.mesh = MeshKit.box(Vector3.ONE)
+	_rubble_mm.instance_count = RUBBLE_MAX
+	_rubble_mm.visible_instance_count = 0
+	var rmi := MultiMeshInstance3D.new()
+	rmi.multimesh = _rubble_mm
+	var rm := MeshKit.toon(Color.WHITE, 0.0, 0.9)
+	rm.vertex_color_use_as_albedo = true
+	rmi.material_override = rm
+	rmi.custom_aabb = AABB(Vector3(-HALF, -10, -HALF), Vector3(HALF * 2.0, 600, HALF * 2.0))
+	add_child(rmi)
 
 	_build_point_lights(beacons)
 

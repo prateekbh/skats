@@ -57,10 +57,17 @@ Source: `scripts/player/turbokat_model.gd` (all colours are constants at the top
 |---|---|---|---|
 | Blowtorch (F) | High-explosive guided missile carried aboard the TurboKat | Lock-on homing missile, regenerates | Straight, white smoke |
 | Octopus | Signature less-than-lethal missile that captures and restrains a target | Restrained gliders fall; turrets pinned for 8 s | Swimming wave, pink ink |
-| Buzz-Saw | Non-explosive spinning saw in a red casing with a shark decal; best against wings; fired as a barrage | One saw per locked target (up to 4); bonus vs gliders | Corkscrew, sparks |
+| Buzz-Saw | Non-explosive spinning saw in a red casing with a shark decal; best against wings; fired as a barrage | One saw per locked target (up to 4); bonus vs gliders; a kill saws the target in two, no explosion | Corkscrew, sparks |
 | Scrambler | Million-megavolt discharge that disables electrical systems; lightning-bolt marking | Disables everything within 75 m for 6 s | Lightning zigzag, electric arcs |
-| Slicer | Non-explosive bladed missile that penetrates targets | Damages armored targets (the warship hull before its turrets fall) | Very fast and dead straight, laser beam |
+| Slicer | Non-explosive bladed missile that penetrates targets | Damages armored targets (the warship hull before its turrets fall); a kill slices the target into five pieces, no explosion | Very fast and dead straight, laser beam |
 | Match Head | Explosive-incendiary missile with a match-like ball tip that ignites | Large blast that sets targets burning | Lobbed arc, fire |
+
+Cut pieces are pooled rigs drawn with `shaders/cut_piece.gdshader` (each piece shows one slab of
+the model between two cut planes; the open cut glows and cools) and trail sparks, electric
+crackle and smoke. Missile hits on buildings deform them (`City.damage_at`: roof knocked down
+with rubble, tower tier snapped and leaning, or a burning hole in the wall, scorched by
+`building.gdshader`) and start a persistent black smoke column (`VFX.add_smoke_column`). The damage
+lasts until the next stage starts (`City.reset_damage`).
 
 Firing a special shows a comic title card and (unless turned off in the pause menu) a ~1 s
 slow-motion launch shot from beside the jet, then straight back to play; the camera never chases

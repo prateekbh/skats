@@ -27,6 +27,11 @@ var burn_t := 0.0
 var burn_dps := 0.0
 ## True while held by an Octopus Missile (Combat draws the tentacles).
 var captured := false
+## Targets that the Slicer / Buzz-Saw cut apart instead of exploding (Creeplings; dragons later).
+var cuttable := false
+## Set by a cutting missile just before its damage lands: a kill then cuts the target into this
+## many pieces (Combat.cut_apart) and the usual explosion is skipped.
+var cut_pieces := 0
 var _flash := 0.0
 var _fx_t := 0.0
 
@@ -79,6 +84,15 @@ func ignite(seconds: float, dps: float) -> void:
 	if alive:
 		burn_t = maxf(burn_t, seconds)
 		burn_dps = maxf(burn_dps, dps)
+
+
+## Cuttable targets: the node whose children match Creepling.model_parts(), and its half-extents.
+func model_root() -> Node3D:
+	return null
+
+
+func cut_extent() -> Vector3:
+	return Vector3.ONE * radius
 
 
 func set_max_hp(value: float) -> void:

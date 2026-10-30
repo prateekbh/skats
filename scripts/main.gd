@@ -166,6 +166,7 @@ func spawn_boss(boss: Node3D) -> Node3D:
 func _clear_world() -> void:
 	_end_missile_cam()
 	combat.clear()
+	city.reset_damage() # the damage stays until the next stage starts
 	for n in get_tree().get_nodes_in_group("mission_spawn"):
 		n.queue_free()
 
@@ -290,7 +291,10 @@ func _on_target_killed(t: Target) -> void:
 	if t.score >= 300 and not _autotest:
 		hit_stop(0.07)
 	if t is Creepling:
-		combat.explode(t.global_position, 2.0 if t.heavy else 1.1)
+		if t.cut_pieces > 0:
+			combat.cut_apart(t) # Slicer / Buzz-Saw: cut to pieces, no explosion
+		else:
+			combat.explode(t.global_position, 2.0 if t.heavy else 1.1)
 		var r := randf()
 		if r < (0.45 if t.heavy else 0.1):
 			combat.drop_pickup(t.global_position, "repair")
@@ -609,6 +613,46 @@ func _weapon_showcase() -> void:
 				c.global_position = at # hold still for the photo
 		get_viewport().get_texture().get_image().save_png("%s/%s.png" % [_opts.weaponshow, shot])
 		combat.clear()
+	# Cutting kills: the Slicer's five pieces and the Buzz-Saw's two, just after the cut and later.
+	for shot in ["slicer", "buzzsaw"]:
+		var c := spawn_creepling(at, false, at)
+		c.set_process(false)
+		camera.global_position = at + Vector3(0, 6, 22)
+		camera.look_at(at + Vector3(0, -2, 0), Vector3.UP)
+		combat._missile_hit(defs_by_id[shot], at + Vector3(0, 0, 2), c)
+		var t := 0.0
+		for snap in [0.15, 0.7]:
+			while t < snap:
+				await get_tree().process_frame
+				t += get_process_delta_time()
+			get_viewport().get_texture().get_image().save_png("%s/%s_%d.png" % [_opts.weaponshow, shot, int(snap * 100)])
+		combat.clear()
+	# Building damage: two roof hits and a wall hit on a downtown tower, then let the smoke rise.
+	var c0 := city.cell_index(200.0, -150.0)
+	for i in range(city.N / 2 - 6, city.N / 2 + 6):
+		for j in range(city.N / 2 - 6, city.N / 2 + 6):
+			var cc := i * city.N + j
+			if city._instance[cc] >= 0 and city._tier[cc] < 0 and city._block_h[cc] > city._block_h[c0]:
+				c0 = cc
+	var bc := Vector3(city._cx[c0], 0.0, city._cz[c0])
+	var bh: float = city._block_h[c0]
+	combat._missile_hit(Arsenal.HOMING, bc + Vector3(5, bh, 3), null)
+	combat._missile_hit(Arsenal.SPECIALS[4], bc + Vector3(-10, bh, -6), null)
+	combat._missile_hit(Arsenal.HOMING, bc + Vector3(city._hw[c0], bh * 0.25, 4), null)
+	print("[weaponshow] building h=%.0f -> %.0f" % [bh, city._block_h[c0]])
+	camera.global_position = bc + Vector3(95, bh + 25, 75)
+	camera.look_at(bc + Vector3(0, bh * 0.45, 0), Vector3.UP)
+	var bt := 0.0
+	while bt < 0.8:
+		await get_tree().process_frame
+		bt += get_process_delta_time()
+	get_viewport().get_texture().get_image().save_png("%s/building_close.png" % _opts.weaponshow)
+	camera.global_position = bc + Vector3(110, bh + 170, 150)
+	camera.look_at(bc + Vector3(0, bh * 0.55, 0), Vector3.UP)
+	while bt < 9.0:
+		await get_tree().process_frame
+		bt += get_process_delta_time()
+	get_viewport().get_texture().get_image().save_png("%s/building.png" % _opts.weaponshow)
 	print("[weaponshow] done")
 	get_tree().quit()
 

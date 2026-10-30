@@ -138,12 +138,20 @@ var beams: Pool
 var stars: Pool
 var rings: Pool
 var streaks: Pool
+## Thick smoke rising from damaged buildings: its own long-lived pool so it never evicts
+## explosions, fed by persistent emitters that last until the stage is cleared.
+var columns: Pool
+var _emitters: Array[Dictionary] = []
+
+const MAX_EMITTERS := 28
+const WIND := Vector3(3.5, 0.0, 1.5)
 
 
 func _ready() -> void:
 	var puff_mat := ShaderMaterial.new()
 	puff_mat.shader = PuffShader
 	puffs = Pool.new(700, _icosphere(), puff_mat, self)
+	columns = Pool.new(900, _icosphere(), puff_mat, self)
 
 	var quad := QuadMesh.new()
 	quad.size = Vector2(2, 2)
@@ -186,9 +194,12 @@ func _process(delta: float) -> void:
 	stars.step(delta)
 	rings.step(delta)
 	streaks.step(delta)
+	_emit_columns(delta)
+	columns.step(delta)
 	for i in streaks.count:
 		streaks.vel[i].y -= 70.0 * delta # debris falls
 	puffs.draw_scaled()
+	columns.draw_scaled()
 	_draw_beams()
 	stars.draw_scaled()
 	rings.draw_scaled()
@@ -216,6 +227,8 @@ func clear() -> void:
 	stars.count = 0
 	rings.count = 0
 	streaks.count = 0
+	columns.count = 0
+	_emitters.clear()
 
 
 static func _rand_dir() -> Vector3:
@@ -320,3 +333,60 @@ func dust(p: Vector3, scale := 1.0) -> void:
 		var d := Vector3(randf_range(-1, 1), randf_range(0.0, 0.4), randf_range(-1, 1)).normalized()
 		puffs.spawn(p + d * 4.0, d * randf_range(14.0, 34.0) * scale, randf_range(1.2, 2.2),
 			randf_range(3.0, 5.0) * scale, randf_range(7.0, 12.0) * scale, KIND_DUST, 1.6, 2.0)
+
+
+# --- cutting missiles (Slicer, Buzz-Saw) ------------------------------------------------
+
+## The moment of the cut: electric flashes, a spray of sparks and a burst of smoke. No fireball.
+func cut(p: Vector3, scale := 1.0) -> void:
+	stars.spawn(p, Vector3.ZERO, 0.14, 2.0, 7.0 * scale, 1.0, 0.0)
+	for k in 5:
+		stars.spawn(p + _rand_dir() * 3.0 * scale, Vector3.ZERO, randf_range(0.12, 0.3), 1.5, 5.0 * scale, 1.0, 0.0, 0.0, 1.0)
+	for k in int(16 * scale):
+		streaks.spawn(p, _rand_dir() * randf_range(50.0, 130.0), randf_range(0.25, 0.6), 0.2, 0.06, 0.0, 0.9)
+	for k in 4:
+		var d := _rand_dir()
+		puffs.spawn(p + d * 1.5, d * randf_range(8.0, 14.0) + Vector3.UP * 3.0, randf_range(0.6, 1.0),
+			0.6, randf_range(1.4, 2.0), KIND_SMOKE, 1.6, 4.0)
+
+
+## Trailing a cut piece as it falls: smoke, plus sparks and electric crackle while the cut is hot.
+func cut_smoke(p: Vector3, heat: float) -> void:
+	puffs.spawn(p + _rand_dir() * 0.4, _rand_dir() * 1.5 + Vector3.UP * 2.0, randf_range(0.5, 0.8),
+		0.3, randf_range(0.7, 1.1), KIND_SMOKE, 2.0, 3.0)
+	if randf() < 0.3 + heat * 0.6:
+		streaks.spawn(p, _rand_dir() * randf_range(25.0, 60.0), randf_range(0.15, 0.3), 0.14, 0.05, 0.0, 1.0)
+	if randf() < heat * 0.35:
+		stars.spawn(p + _rand_dir() * 1.2, Vector3.ZERO, randf_range(0.08, 0.16), 0.6, 2.4, 0.9, 0.0, 0.0, 1.0)
+
+
+# --- building damage --------------------------------------------------------------------
+
+## Starts (or thickens) a column of black smoke that rises until the stage is cleared.
+## Emitters within 25 m merge, so repeated hits on one building make one heavier column.
+func add_smoke_column(p: Vector3, strength := 1.0) -> void:
+	for e in _emitters:
+		if (e.p as Vector3).distance_to(p) < 25.0:
+			e.strength = minf(float(e.strength) + strength * 0.5, 2.2)
+			return
+	if _emitters.size() >= MAX_EMITTERS:
+		_emitters.pop_front()
+	_emitters.append({"p": p, "strength": strength, "acc": 0.0})
+
+
+func _emit_columns(dt: float) -> void:
+	for e in _emitters:
+		var st: float = e.strength
+		e.acc = float(e.acc) + dt * (3.0 + st * 2.0)
+		while e.acc >= 1.0:
+			e.acc = float(e.acc) - 1.0
+			var p: Vector3 = e.p
+			# Rises ~13 m/s (lift / drag) and drifts with the wind for ~11 s: a column well over
+			# 100 m tall that widens and breaks up as it climbs.
+			columns.spawn(p + Vector3(randf_range(-4, 4), randf_range(0, 3), randf_range(-4, 4)),
+				Vector3.UP * randf_range(8.0, 14.0) + WIND, randf_range(9.0, 12.0),
+				randf_range(4.5, 6.5), randf_range(20.0, 28.0) * (0.7 + 0.3 * st), KIND_SMOKE, 0.18, 2.4, 3.0)
+			if randf() < 0.35:
+				# Flames licking out of the damage at the base of the column.
+				puffs.spawn(p + _rand_dir() * 2.5 * st, Vector3.UP * 6.0 + _rand_dir() * 2.0, randf_range(0.4, 0.7),
+					1.5 * st, 4.0 * st, KIND_FIRE, 2.0, 8.0)

@@ -51,6 +51,11 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
   menu. The selected missile shows as a card with its picture from the show (from the
   swatkats.info missile catalogue) on a cockpit weapons screen; cycling with Q slides the cards
   across it like a carousel. The launch intro plays over the theme music only.
+- **Cutting kills and city damage:** a Slicer kill slices a Creepling into five pieces and a
+  Buzz-Saw kill saws it in two, with no explosion: the pieces tumble away with glowing cut
+  edges, electric sparks and smoke. Missiles that hit buildings knock roofs down (with rubble),
+  topple tower tiers or blast burning holes in walls, and leave thick black smoke columns that
+  keep rising until the stage ends, so the damage to Megakat City stays visible.
 - **Cartoon effects:** banded toon fireballs that break up into chunky smoke, impact stars,
   shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on
   big kills. All pooled (no per-explosion allocations) to keep the web build smooth.

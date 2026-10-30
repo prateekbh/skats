@@ -2,7 +2,7 @@ shader_type spatial;
 render_mode unshaded, cull_back;
 // Cartoon fireball / smoke puff, drawn as a lumpy sphere with hard colour bands.
 // One MultiMesh draws every puff; INSTANCE_CUSTOM = (age 0..1, seed, kind, 0).
-// kind: 0 fire, 0.33 smoke, 0.66 dust, 1 trail smoke.
+// kind: 0 fire, 0.33 smoke, 0.66 dust, 1 trail smoke. Smoke with tint 3 is black building smoke.
 
 uniform vec3 sun_dir = vec3(-0.6, 0.45, 0.3);
 
@@ -62,6 +62,11 @@ void fragment() {
 		vec3 lit_col = vec3(0.42, 0.39, 0.42);
 		vec3 dark_col = vec3(0.22, 0.2, 0.23);
 		if (v_kind > 0.5 && v_kind < 0.85) { lit_col = vec3(0.6, 0.5, 0.4); dark_col = vec3(0.38, 0.31, 0.26); }
+		if (v_kind < 0.5 && v_tint > 2.5) {
+			// Burning-building smoke: thick and near-black, lit a dull orange low down by the fire.
+			lit_col = mix(vec3(0.42, 0.2, 0.1), vec3(0.14, 0.13, 0.15), smoothstep(0.0, 0.1, v_age));
+			dark_col = vec3(0.06, 0.055, 0.07);
+		}
 		if (v_kind >= 0.85) {
 			// Missile trails: 0 white smoke, 1 Octopus pink ink, 2 Scrambler blue haze.
 			lit_col = vec3(0.86, 0.85, 0.86); dark_col = vec3(0.58, 0.57, 0.62);

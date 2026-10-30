@@ -1,10 +1,18 @@
 shader_type spatial;
 // Megakat City towers. Windows are laid out in world space, so they stay the same size
 // whatever height a building is scaled to. INSTANCE_CUSTOM.r seeds which windows are lit.
+// Missile damage (City.damage_at): INSTANCE_CUSTOM.g is the impact height (0 = undamaged) and
+// .b / .a its offset from the centre in half-widths; around it the wall is scorched black with
+// a burnt-out hole and flickering embers. COLOR.a < 0.5 marks a broken roof: the top floors
+// are charred too, independently of the wall hit.
 
 varying vec3 world_pos;
 varying vec3 world_normal;
 varying float seed;
+varying vec3 impact;
+varying float damaged;
+varying float top;
+varying float roof_burnt;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -14,12 +22,42 @@ void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	seed = INSTANCE_CUSTOM.r;
+	damaged = step(0.5, INSTANCE_CUSTOM.g);
+	top = MODEL_MATRIX[3].y + length(MODEL_MATRIX[1].xyz) * 0.5;
+	roof_burnt = 1.0 - step(0.5, COLOR.a);
+	vec3 centre = MODEL_MATRIX[3].xyz;
+	vec2 half_size = vec2(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[2].xyz)) * 0.5;
+	impact = vec3(centre.x + INSTANCE_CUSTOM.b * half_size.x, INSTANCE_CUSTOM.g, centre.z + INSTANCE_CUSTOM.a * half_size.y);
+}
+
+// 0 = clean, 1 = scorched, 2 = burnt-out hole, with jagged edges.
+float scorch(vec3 p) {
+	float jag = hash(floor(p.xz * 0.35) + floor(p.y * 0.3)) - 0.5;
+	float s = 0.0;
+	if (roof_burnt > 0.5) {
+		s = step(top - 16.0 + jag * 8.0, p.y); // charred top floors
+	}
+	if (damaged > 0.5) {
+		vec3 q = p - impact;
+		q.y *= 0.8; // scorch climbs the wall a little
+		float d = length(q) + jag * 6.0;
+		s = max(s, step(d, 24.0) + step(d, 9.0));
+	}
+	return s;
 }
 
 void fragment() {
 	vec3 wall = COLOR.rgb * 0.32;
-	if (world_normal.y > 0.5) {
-		ALBEDO = vec3(0.08, 0.085, 0.11);
+	float burnt = scorch(world_pos);
+	float flicker = 0.65 + 0.35 * sin(TIME * 9.0 + hash(floor(world_pos.xy * 0.5)) * 6.28);
+	if (burnt > 1.5) {
+		// The hole: charred black with glowing embers in the cracks.
+		float ember = step(0.62, hash(floor(world_pos.xz * 0.9) + floor(world_pos.y * 0.9) * 7.0));
+		ALBEDO = vec3(0.02);
+		EMISSION = vec3(1.0, 0.38, 0.08) * ember * flicker * 2.2;
+		ROUGHNESS = 1.0;
+	} else if (world_normal.y > 0.5) {
+		ALBEDO = burnt > 0.5 ? vec3(0.03) : vec3(0.08, 0.085, 0.11);
 		ROUGHNESS = 0.95;
 	} else {
 		float u = abs(world_normal.x) > 0.5 ? world_pos.z : world_pos.x;
@@ -32,6 +70,12 @@ void fragment() {
 		vec3 warm = vec3(1.0, 0.76, 0.42);
 		vec3 cool = vec3(0.55, 0.8, 1.0);
 		vec3 lit = mix(warm, cool, step(0.78, hash(id * 1.7 + seed * 31.0)));
+		if (burnt > 0.5) {
+			// Scorched: soot-black wall, windows blown out, a few still glowing with fire.
+			wall = vec3(0.035, 0.03, 0.03);
+			lit = vec3(1.0, 0.45, 0.12) * flicker;
+			on *= step(0.75, hash(id * 2.3 + seed));
+		}
 		ALBEDO = mix(wall, vec3(0.04, 0.05, 0.08), win);
 		EMISSION = lit * win * on * 1.7;
 		ROUGHNESS = mix(0.85, 0.15, win);

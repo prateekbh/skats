@@ -24,8 +24,8 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   (the missile launch shot is skipped in autotests; add `--mcam` to include it, and `--shots=<dir>` under
   xvfb to photograph it).
 - Screenshots need a display: `xvfb-run godot --path . --rendering-driver opengl3 -- --showcase=<dir>`
-  (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--weaponshow=<dir>` (missile models
-  and effects), `--snap=<file> [--intro --snap-at=<s>]`
+  (TurboKat angles), `--fxshow=<dir>` (explosion/effect stages), `--weaponshow=<dir>` (missile models,
+  effects, Slicer / Buzz-Saw cuts and building damage), `--snap=<file> [--intro --snap-at=<s>]`
   (title or intro frames).
 - Everything visual is generated in code or by the scripts in `tools/` (re-run them, don't hand-edit
   their outputs): `convert_turbokat.py` (3D model and paint), `prepare_launch_art.py` (launch-screen
