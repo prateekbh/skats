@@ -5,231 +5,246 @@
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>$GODOT_PROJECT_NAME</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
 		<style>
-/* Launch screen: a key-art poster. The SWAT KATS logo up top, Razor and T-Bone front and
-   centre, Dark Kat and Turmoil looming over the Megakat skyline behind them, and a
-   comm panel where the cast chatter while the game downloads.
-   Art lives in launch/ next to index.html (built by tools/prepare_launch_art.py). */
+/* The launcher: a comic-book page over the game canvas. Character panels around a big centre
+   panel with our TurboKat (rendered by the game, see tools/render_launch_art.py) and the menu.
+   It is the title screen: the game loads behind it, then the menu launches stages through
+   window.skGameLaunch (scripts/autoload/web_launcher.gd). Art lives in launch/ next to index.html. */
 :root {
-	--night: #06070d;
-	--sky-top: #0b0a1d;
-	--sky-mid: #3b1640;
-	--sky-low: #d0482a;
-	--yellow: #ffd23f;
-	--orange: #ff6a1f;
-	--red: #d42a22;
-	--hud: #9dffb5;
-	--ink: #040407;
-	--ui: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
+	--ink: #0c0b10;
+	--paper: #efe4c8;
+	--red: #d7261e;
+	--yellow: #ffd23a;
+	--purple: #3b1556;
+	--gutter: 14px;
+	--border: 5px;
+	--display: 'Bangers', Impact, sans-serif;
 }
-
+* { box-sizing: border-box; }
 html, body, #canvas { margin: 0; padding: 0; border: 0; }
-body { color: #fff; background: var(--night); overflow: hidden; touch-action: none; }
+body { background: var(--ink); overflow: hidden; touch-action: none; font-family: 'Comic Neue', 'Comic Sans MS', sans-serif; color: var(--ink); }
 #canvas { display: block; }
 #canvas:focus { outline: none; }
-
-#status {
-	position: absolute; inset: 0; overflow: hidden; visibility: hidden; isolation: isolate;
-	background: radial-gradient(130% 75% at 50% 100%, var(--sky-low) 0%, var(--sky-mid) 42%, var(--sky-top) 78%, var(--night) 100%);
-	font-family: var(--ui);
-}
 #status-splash { display: none; }
 
-/* Slow cinematic push-in on the whole poster. */
-.stage { position: absolute; inset: 0; animation: push 20s ease-out both; }
-@keyframes push { from { transform: scale(1.07); } to { transform: scale(1); } }
+#launcher {
+	position: fixed; inset: 0; z-index: 10; overflow: hidden;
+	background: var(--paper) radial-gradient(rgba(120, 90, 40, 0.10) 1px, transparent 1.2px) 0 0 / 5px 5px;
+}
+#launcher[hidden] { display: none; }
+.page {
+	position: absolute; inset: var(--gutter);
+	display: grid; grid-template-columns: 1fr 1.05fr 2.3fr 1.05fr; grid-template-rows: 1.15fr 1fr; gap: var(--gutter);
+}
+.panel {
+	position: relative; overflow: hidden; border: var(--border) solid var(--ink); background: #fff;
+	box-shadow: 5px 6px 0 rgba(12, 11, 16, 0.35);
+}
+.panel::after { /* Ben-Day dots */
+	content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+	background-image: radial-gradient(rgba(0, 0, 0, 0.16) 1.1px, transparent 1.4px); background-size: 6px 6px; mix-blend-mode: multiply;
+}
+.burst { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg at 50% 50%, var(--c1) 0 6deg, var(--c2) 6deg 12deg); }
+.char {
+	position: absolute; z-index: 1; max-width: none;
+	filter: drop-shadow(4px 0 0 var(--ink)) drop-shadow(-4px 0 0 var(--ink)) drop-shadow(0 4px 0 var(--ink)) drop-shadow(0 -4px 0 var(--ink));
+}
+.caption {
+	position: absolute; z-index: 3; background: var(--yellow); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+	font-family: var(--display); letter-spacing: 1px; font-size: clamp(13px, 1.15vw, 22px); padding: 4px 10px; text-transform: uppercase;
+}
+.bubble {
+	position: absolute; z-index: 3; background: #fff; border: 3px solid var(--ink); border-radius: 50% / 46%;
+	padding: 14px 22px; font-size: clamp(12px, 1.05vw, 20px); text-align: center; line-height: 1.15; text-transform: uppercase;
+}
+.bubble::after {
+	content: ""; position: absolute; width: 26px; height: 30px; background: #fff;
+	border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink);
+	transform: skewX(var(--skew, 30deg)) rotate(20deg); bottom: -16px; left: var(--tail, 30%);
+}
+.sfx { position: absolute; z-index: 3; font-family: var(--display); color: var(--yellow); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 5px 5px 0 var(--red); }
 
-/* Moon behind the logo, as in the title card. */
-.moon {
-	position: absolute; left: 50%; top: 7vh; width: 50vh; height: 50vh; transform: translateX(-50%);
-	border-radius: 50%; opacity: 0.85;
-	background: radial-gradient(circle at 40% 38%, #f3eef9 0%, #cfc4e4 45%, #9d8fc4 75%, rgba(157, 143, 196, 0) 76%);
-	box-shadow: 0 0 120px 30px rgba(190, 170, 240, 0.25);
-	animation: fadein 2s ease-out both;
-}
+.p-heroes { grid-column: 1 / 3; grid-row: 1; clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%); }
+.p-heroes .burst { --c1: #ff9b2f; --c2: #ffc23a; }
+.p-heroes .char { height: 108%; left: 50%; bottom: -14%; transform: translateX(-46%); }
+.p-callie { grid-column: 1; grid-row: 2; background: #1c2a4a; }
+.p-callie img, .p-attack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.p-callie img { object-position: 50% 30%; filter: saturate(1.15) contrast(1.05); }
+.p-attack { grid-column: 2; grid-row: 2; background: #301a1c; }
+.p-attack img { object-position: 45% 40%; filter: saturate(1.25) contrast(1.1); }
+.p-villain { grid-column: 4; grid-row: 1; background: var(--purple); clip-path: polygon(4% 0, 100% 0, 100% 100%, 0 100%); }
+.p-villain .burst { --c1: #2a0c3f; --c2: #4b1c6e; }
+.p-villain .char { height: 88%; right: -16%; bottom: -2%; }
+.p-turmoil { grid-column: 4; grid-row: 2; background: #5a0f12; }
+.p-turmoil .burst { --c1: #6d1414; --c2: #8f1f1a; }
+.p-turmoil .char { height: 104%; left: -6%; bottom: -10%; }
 
-/* Haze and out-of-focus city lights. */
-.haze {
-	position: absolute; inset: 0;
-	background: radial-gradient(60% 30% at 25% 62%, rgba(255, 120, 80, 0.2), transparent 70%),
-		radial-gradient(50% 25% at 78% 58%, rgba(255, 80, 120, 0.16), transparent 70%);
-	animation: drift 26s ease-in-out infinite alternate;
+/* Centre panel: the TurboKat over Megakat City, and the menu. */
+.p-main { grid-column: 3; grid-row: 1 / 3; background: linear-gradient(#1b1b4d 0%, #6b2c62 38%, #f0784c 66%, #ffb35c 78%); }
+.p-main .speed { position: absolute; inset: 0; background: repeating-conic-gradient(from 0deg at 72% 40%, rgba(255, 240, 210, 0.16) 0 1.4deg, transparent 1.4deg 7deg); }
+.p-main .sun { position: absolute; width: 34%; aspect-ratio: 1; left: 58%; top: 34%; border-radius: 50%; background: radial-gradient(#fff3c4, #ffc35c 60%, transparent 70%); }
+.p-main svg.city { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 46%; }
+.jet-wrap { position: absolute; inset: 0; z-index: 2; }
+.p-main .jet { position: absolute; width: 104%; left: -6%; top: 21%; filter: drop-shadow(10px 18px 0 rgba(12, 11, 16, 0.35)); }
+.p-main .logo { position: absolute; z-index: 3; width: 56%; left: 22%; top: 3%; filter: drop-shadow(5px 6px 0 var(--ink)); }
+.menu { position: absolute; z-index: 6; left: 50%; bottom: 4.5%; transform: translateX(-50%); width: min(66%, 660px); display: grid; gap: 10px; }
+.menu button, .sheet button {
+	font-family: var(--display); font-size: clamp(17px, 1.6vw, 30px); letter-spacing: 1.5px; color: var(--ink);
+	background: var(--yellow); border: 4px solid var(--ink); padding: 8px 18px; box-shadow: 5px 5px 0 var(--ink);
+	text-align: left; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; transform: skewX(-8deg);
+	transition: translate 0.08s, box-shadow 0.08s;
 }
-@keyframes drift { from { transform: translateX(-2%); } to { transform: translateX(2%); } }
+.menu button:hover:not(:disabled), .menu button:focus-visible, .sheet button:hover, .sheet button:focus-visible { outline: none; translate: -2px -2px; box-shadow: 7px 7px 0 var(--ink); background-color: #ffe27a; }
+.menu button.primary, .sheet button.primary { background: var(--red); color: #fff; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; font-size: clamp(20px, 2vw, 38px); }
+.menu button.primary:hover:not(:disabled), .menu button.primary:focus-visible, .sheet button.primary:hover, .sheet button.primary:focus-visible { background: #ef3a2e; }
+.menu button.soon, .menu button:disabled { background: #b9b2a0; color: #4a463e; cursor: default; -webkit-text-stroke: 0; }
+.menu .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.menu .row button { justify-content: center; }
+.menu .best { font-size: 0.75em; align-self: center; }
+.loading { display: grid; gap: 6px; font-family: var(--display); font-size: clamp(16px, 1.4vw, 26px); letter-spacing: 1.5px; color: #fff; -webkit-text-stroke: 1px var(--ink); paint-order: stroke fill; text-align: center; }
+.loading .bar { height: 18px; border: 4px solid var(--ink); background: #fff; box-shadow: 4px 4px 0 var(--ink); transform: skewX(-8deg); overflow: hidden; }
+.loading .bar i { display: block; height: 100%; width: 0%; background: repeating-linear-gradient(-45deg, var(--red) 0 12px, #ef4a2e 12px 24px); transition: width 0.25s; }
+.loading.indeterminate .bar i { width: 30%; animation: scan 1.1s ease-in-out infinite alternate; }
+@keyframes scan { from { margin-left: 0; } to { margin-left: 70%; } }
+.fine { position: absolute; z-index: 6; bottom: 4px; left: 0; right: 0; text-align: center; font-size: 11px; color: rgba(255, 255, 255, 0.8); }
+#status-notice { display: none; position: absolute; z-index: 7; left: 8%; right: 8%; top: 40%; background: #fff; border: 4px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 14px 18px; text-align: center; font-size: 16px; }
 
-/* Villains loom over the city, tinted by the fires below. */
-.villain {
-	position: absolute; bottom: 14vh; pointer-events: none; animation: loom 2.4s ease-out both;
-	filter: drop-shadow(0 0 26px rgba(255, 50, 60, 0.5)); /* on the wrapper so the image mask can't clip it */
+/* Briefing, controls and settings: a comic panel dropped over the page. */
+.sheet-back { position: absolute; inset: 0; z-index: 20; background: rgba(12, 11, 16, 0.55); display: grid; place-items: center; }
+.sheet-back[hidden] { display: none; }
+.sheet {
+	position: relative; width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+	background: #fff; border: 6px solid var(--ink); box-shadow: 10px 10px 0 var(--ink); padding: 22px 26px 24px;
+	animation: pop 0.3s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
-.villain img { display: block; height: 100%; width: auto; max-width: none; }
-.villain.dark-kat { left: 1vw; height: 66vh; --tilt: -2deg; }
-.villain.turmoil { right: 0; height: 62vh; --tilt: 2deg; animation-delay: 0.3s; }
-.villain img {
-	filter: brightness(0.6) saturate(0.85);
-	-webkit-mask-image: linear-gradient(to top, transparent 0%, #000 35%);
-	mask-image: linear-gradient(to top, transparent 0%, #000 35%);
-}
-@keyframes loom { from { opacity: 0; transform: translateY(4vh) scale(1.06) rotate(var(--tilt)); } to { opacity: 1; transform: rotate(var(--tilt)); } }
+.sheet::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1.1px, transparent 1.4px); background-size: 6px 6px; }
+.sheet h2 { font-family: var(--display); font-weight: normal; letter-spacing: 2px; font-size: clamp(30px, 3.4vw, 52px); margin: 0 0 4px; color: var(--yellow); -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; text-shadow: 4px 4px 0 var(--red); }
+.sheet .kicker { font-family: var(--display); letter-spacing: 1.5px; font-size: 20px; color: var(--red); }
+.sheet .who { display: flex; align-items: center; gap: 12px; margin: 6px 0 12px; font-size: 18px; }
+.sheet .who img { width: 64px; height: 64px; border: 3px solid var(--ink); object-fit: cover; }
+.sheet p { font-size: 18px; line-height: 1.35; margin: 0 0 10px; white-space: pre-line; }
+.sheet ul { margin: 0 0 16px; padding-left: 22px; font-size: 18px; }
+.sheet .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.sheet .actions button { flex: 1; justify-content: center; }
+.sheet table { width: 100%; border-collapse: collapse; font-size: 16px; margin-bottom: 14px; }
+.sheet td, .sheet th { border-bottom: 2px solid #e2dccb; padding: 6px 8px; text-align: left; }
+.sheet th { font-family: var(--display); font-weight: normal; letter-spacing: 1px; font-size: 18px; }
+.sheet label { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 19px; padding: 10px 0; border-bottom: 2px solid #e2dccb; }
+.sheet label small { display: block; font-size: 14px; color: #555; }
+.sheet input[type=checkbox] { width: 28px; height: 28px; accent-color: var(--red); flex: none; }
 
-/* Skyline silhouette, in front of the villains and behind the heroes. */
-.skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 30vh; }
-.skyline svg { width: 100%; height: 100%; display: block; }
-
-/* Razor and T-Bone. */
-.heroes {
-	position: absolute; left: 50%; bottom: 20vh; height: 68vh; transform: translateX(-50%);
-	animation: rise 1.2s cubic-bezier(.2, .8, .2, 1) 0.5s both;
-	filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)) drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6));
-}
-.heroes::before {
-	content: ""; position: absolute; inset: 10% -8% 0; z-index: -1; border-radius: 50%;
-	background: radial-gradient(closest-side, rgba(255, 150, 60, 0.55), transparent);
-	filter: blur(24px);
-}
-.heroes img {
-	display: block; height: 100%; width: auto; max-width: none;
-	-webkit-mask-image: linear-gradient(to top, transparent 0%, #000 22%);
-	mask-image: linear-gradient(to top, transparent 0%, #000 22%);
-	animation: breathe 6s ease-in-out 1.7s infinite;
-}
-@keyframes rise { from { transform: translate(-50%, 16vh); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
-@keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.7vh); } }
-
-/* The SWAT KATS logo across the heroes' legs, as on the title card, with a light sweep. */
-.logo {
-	position: absolute; left: 50%; bottom: 9vh; width: min(48vw, 70vh * 1.98, 700px); transform: translateX(-50%);
-	z-index: 3; animation: slam 0.8s cubic-bezier(.2, 1.5, .4, 1) 1.2s both;
-}
-.logo img { display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 90, 40, 0.35)); }
-.logo .sheen {
-	position: absolute; inset: 0;
-	-webkit-mask: url(launch/logo.svg) center / 100% 100% no-repeat; mask: url(launch/logo.svg) center / 100% 100% no-repeat;
-	background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.75) 50%, transparent 58%) no-repeat;
-	background-size: 260% 100%; animation: sheen 5s ease-in-out 2.4s infinite;
-}
-@keyframes sheen { from { background-position: 150% 0; } 35%, to { background-position: -60% 0; } }
-@keyframes slam { from { transform: translateX(-50%) scale(2.2); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
-@keyframes fadein { from { opacity: 0; } }
-
-/* Letterbox bars. */
-.bars::before, .bars::after { content: ""; position: absolute; left: 0; right: 0; height: 4.5vh; background: var(--ink); z-index: 4; }
-.bars::before { top: 0; }
-.bars::after { bottom: 0; }
-
-/* Comm panel: speaker portrait, radio line, spool gauge. */
-.comm {
-	position: absolute; left: max(16px, 2vw); bottom: 7vh; z-index: 5;
-	width: min(340px, calc(100vw - 32px)); box-sizing: border-box;
-	display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center;
-	padding: 12px 14px; background: rgba(6, 8, 14, 0.82); border: 2px solid var(--ink);
-	box-shadow: 0 0 0 1px rgba(157, 255, 181, 0.25), 0 12px 30px rgba(0, 0, 0, 0.6);
-	animation: fadein 0.6s ease-out 1.6s both;
-}
-.face {
-	grid-row: span 2; width: 58px; height: 58px; position: relative; overflow: hidden;
-	border: 2px solid var(--hud); box-shadow: 0 0 12px rgba(157, 255, 181, 0.35);
-}
-.face img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.face::after { /* scanlines */
-	content: ""; position: absolute; inset: 0;
-	background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
-}
-.quote { min-width: 0; }
-.quote .who-name { color: var(--yellow); font-weight: 700; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; }
-.quote .line { font-size: 16px; margin-top: 2px; line-height: 1.3; }
-.swap { animation: swap 0.45s ease-out; }
-@keyframes swap { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-.gauge { display: flex; align-items: center; gap: 12px; }
-.bar { flex: 1; height: 4px; background: rgba(255, 255, 255, 0.14); position: relative; overflow: hidden; }
-.bar i { position: absolute; inset: 0 auto 0 0; width: 0%; background: linear-gradient(90deg, var(--orange), var(--yellow)); box-shadow: 0 0 12px var(--orange); transition: width 0.25s; }
-.bar.indeterminate i { width: 30%; animation: scan 1.1s ease-in-out infinite alternate; }
-@keyframes scan { from { left: 0; } to { left: 70%; } }
-.pct { color: var(--hud); font-weight: 700; font-size: 11px; letter-spacing: 0.12em; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-/* Sound toggle (top right, under the letterbox bar). */
+/* Sound toggle (top right). */
 .sound {
-	position: absolute; top: calc(4.5vh + 12px); right: max(16px, 2vw); z-index: 6;
-	display: flex; align-items: center; gap: 8px; cursor: pointer;
-	font: 700 11px var(--ui); letter-spacing: 0.16em; color: #fff;
-	background: rgba(6, 8, 14, 0.7); border: 1px solid rgba(157, 255, 181, 0.4); padding: 8px 12px;
+	position: absolute; top: 26px; right: 26px; z-index: 15; display: flex; align-items: center; gap: 8px; cursor: pointer;
+	font-family: var(--display); letter-spacing: 1.5px; font-size: 16px; color: var(--ink);
+	background: #fff; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); padding: 5px 12px;
 }
-.sound:hover, .sound:focus-visible { border-color: var(--hud); outline: none; }
 .sound .eq { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
-.sound .eq i { width: 3px; background: var(--hud); height: 30%; }
+.sound .eq i { width: 3px; background: var(--red); height: 30%; }
 .sound.on .eq i { animation: eq 0.9s ease-in-out infinite alternate; }
 .sound.on .eq i:nth-child(2) { animation-delay: -0.3s; }
 .sound.on .eq i:nth-child(3) { animation-delay: -0.6s; }
 @keyframes eq { from { height: 25%; } to { height: 100%; } }
-
-#status-notice {
-	display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6;
-	background: #5b3943; border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
-	color: #f2e6e6; line-height: 1.4; padding: 1rem 1.4rem; text-align: center;
-	width: min(520px, calc(100vw - 32px)); box-sizing: border-box;
-}
-.fine { position: absolute; bottom: 1.2vh; left: 0; right: 0; text-align: center; font-size: 10px; color: rgba(255, 255, 255, 0.45); z-index: 5; letter-spacing: 0.05em; }
 .missing { display: none !important; }
 
-/* Phones and narrow windows. */
-@media (max-aspect-ratio: 1/1) {
-	.moon { width: 36vh; height: 36vh; top: 8vh; }
-	.heroes { height: 46vh; bottom: 34vh; }
-	.logo { width: 92vw; bottom: 22vh; }
-	.villain.dark-kat { left: -22vw; height: 36vh; bottom: 40vh; }
-	.villain.turmoil { right: -20vw; height: 34vh; bottom: 40vh; }
-	.comm { left: 50%; transform: translateX(-50%); bottom: 6vh; }
-}
+/* --- Opening: the page is inked panel by panel, the TurboKat streaks in and the logo slams.
+   Resting styles are the final state; .anim (under .open) adds the entrance with delay --d.
+   A click or key skips it; reduced motion turns it off. */
+@keyframes slam { 0% { opacity: 0; scale: 1.35; rotate: var(--r, -3deg); } 60% { opacity: 1; scale: 0.97; rotate: 0deg; } 100% { opacity: 1; scale: 1; } }
+@keyframes rise { from { opacity: 0; translate: 0 38%; } to { opacity: 1; translate: 0 0; } }
+@keyframes pop { 0% { opacity: 0; scale: 0; } 70% { opacity: 1; scale: 1.14; } 100% { opacity: 1; scale: 1; } }
+@keyframes streak { 0% { opacity: 0; translate: -95% 45%; scale: 0.6; } 12% { opacity: 1; } 100% { opacity: 1; translate: 0 0; scale: 1; } }
+@keyframes logoslam { 0% { opacity: 0; scale: 3.2; rotate: -10deg; } 65% { opacity: 1; scale: 0.92; rotate: 1deg; } 100% { opacity: 1; scale: 1; rotate: 0deg; } }
+@keyframes shake { 0%, 100% { translate: 0 0; } 20% { translate: -9px 5px; } 40% { translate: 8px -6px; } 60% { translate: -5px 3px; } 80% { translate: 3px -2px; } }
+@keyframes drop { from { opacity: 0; translate: 0 -34px; } to { opacity: 1; translate: 0 0; } }
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes spin { to { rotate: 360deg; } }
+@keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes leave { to { opacity: 0; scale: 1.25; } }
+.open .panel.anim { animation: slam 0.4s cubic-bezier(0.2, 0.8, 0.3, 1.25) var(--d) both; }
+.open .char.anim { animation: rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) var(--d) both; }
+.open .pop.anim { animation: pop 0.34s cubic-bezier(0.3, 1.4, 0.5, 1) var(--d) both; }
+.open .city.anim { animation: rise 0.6s ease-out var(--d) both; }
+.open .sun.anim { animation: pop 0.6s ease-out var(--d) both; }
+.open .jet.anim { animation: streak 0.75s cubic-bezier(0.1, 0.8, 0.25, 1) var(--d) both; }
+.open .logo.anim { animation: logoslam 0.38s cubic-bezier(0.2, 0.8, 0.3, 1.2) var(--d) both; }
+.open .menu.anim { animation: drop 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.3) var(--d) both; }
+.open .page.anim { animation: shake 0.32s linear var(--d) both; }
+.p-main .flash { position: absolute; inset: 0; z-index: 7; background: #fff; pointer-events: none; opacity: 0; }
+.open .flash.anim { animation: flash 0.45s ease-out var(--d) both; }
+.burst { animation: spin 90s linear infinite; }
+.jet-wrap { animation: bob 3.2s ease-in-out 3s infinite; }
+.p-main .speed { animation: pulse 2.4s ease-in-out infinite; }
+.skip .anim { animation: none !important; }
+#launcher.leaving .page { animation: leave 0.45s ease-in both; }
 
+/* Phones and portrait windows: the centre panel takes the page, heroes and villain above it. */
+@media (max-aspect-ratio: 1/1) {
+	.page { grid-template-columns: 1fr 1fr; grid-template-rows: 0.8fr 2fr; }
+	.p-heroes { grid-column: 1; grid-row: 1; }
+	.p-villain { grid-column: 2; grid-row: 1; }
+	.p-main { grid-column: 1 / 3; grid-row: 2; }
+	.p-callie, .p-attack, .p-turmoil, .p-heroes .bubble, .p-heroes .caption { display: none; }
+	.menu { width: 88%; }
+	.p-main .jet { top: 26%; }
+}
 @media (prefers-reduced-motion: reduce) {
-	.stage, .moon, .haze, .villain, .heroes, .heroes img, .logo, .logo .sheen, .comm, .swap, .bar.indeterminate i { animation: none !important; }
+	.anim, .burst, .jet-wrap, .p-main .speed, .sheet, .loading .bar i { animation: none !important; }
 }
 		</style>
 		$GODOT_HEAD_INCLUDE
 	</head>
 	<body>
-		<canvas id="canvas">Your browser does not support the canvas tag.</canvas>
+		<canvas id="canvas" tabindex="0">Your browser does not support the canvas tag.</canvas>
 		<noscript>Your browser does not support JavaScript.</noscript>
+		<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
 
-		<div id="status">
-			<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
-			<div class="stage">
-				<div class="moon"></div>
-				<div class="haze"></div>
-				<div class="villain dark-kat"><img src="launch/dark_kat.png" alt="Dark Kat"></div>
-				<div class="villain turmoil"><img src="launch/turmoil.png" alt="Turmoil"></div>
-				<div class="skyline" aria-hidden="true">
-					<svg viewBox="0 0 1600 300" preserveAspectRatio="none">
-						<defs>
-							<pattern id="win" width="12" height="16" patternUnits="userSpaceOnUse">
-								<rect width="12" height="16" fill="#0d0913"/>
-								<rect x="3" y="4" width="5" height="7" fill="#ffc96b" opacity="0.5"/>
-							</pattern>
-						</defs>
-						<path fill="url(#win)" d="M0 300V170h60v-60h40v-40h30v40h50V150h70V50h20V20h12v30h20v100h60V110h80v-50h40v50h50V140h90V30h16V0h8v30h16v110h70V120h60v-80h70v80h40V160h80V100h50V60h30v40h40v60h80V130h60v30h50V90h70v70h60V140h80v160Z"/>
-					</svg>
-				</div>
-				<div class="heroes"><img src="launch/swat_kats.png" alt="T-Bone and Razor"></div>
-				<div class="logo"><img src="launch/logo.svg" alt="SWAT Kats: The Radical Squadron"><div class="sheen"></div></div>
+		<div id="launcher" class="open">
+			<div class="page anim" style="--d:2.05s">
+				<section class="panel p-heroes anim" style="--d:0.1s; --r:-4deg">
+					<div class="burst"></div>
+					<img class="char anim" style="--d:0.3s" src="launch/swat_kats.png" alt="T-Bone and Razor">
+					<div class="caption pop anim" style="--d:0.5s; left:10px; top:10px">Megakat City's last line of defence…</div>
+					<div class="bubble pop anim" style="--d:0.62s; right:6%; top:16%; max-width:38%; --tail:18%">Hatch is open, buddy. Let's light 'em up!</div>
+				</section>
+				<section class="panel p-callie anim" style="--d:0.4s; --r:3deg">
+					<img src="launch/callie.png" alt="Callie Briggs">
+					<div class="caption pop anim" style="--d:0.75s; left:8px; bottom:8px; background:#fff">Deputy Mayor Callie Briggs</div>
+					<div class="bubble pop anim" style="--d:0.85s; left:8%; top:8%; max-width:84%; --tail:60%; --skew:-30deg">SWAT Kats, come in!</div>
+				</section>
+				<section class="panel p-attack anim" style="--d:0.55s; --r:-3deg">
+					<img src="launch/city_attack.png" alt="">
+					<div class="sfx pop anim" style="--d:0.85s; font-size:clamp(36px,4.2vw,84px); left:8%; top:18%; rotate:-12deg">KA-BLAM!</div>
+					<div class="caption pop anim" style="--d:0.95s; left:8px; bottom:8px">Enforcer HQ under attack!</div>
+				</section>
+				<section class="panel p-main anim" style="--d:0.9s; --r:1.5deg">
+					<div class="flash anim" style="--d:0.95s"></div>
+					<div class="speed"></div>
+					<div class="sun anim" style="--d:1.05s"></div>
+					<svg class="city anim" style="--d:1s" viewBox="0 0 1000 400" preserveAspectRatio="none" id="city" aria-hidden="true"></svg>
+					<div class="jet-wrap"><img class="jet anim" style="--d:1.25s" src="launch/turbokat_hero.png" alt="The TurboKat"></div>
+					<img class="logo anim" style="--d:1.9s" src="launch/logo.svg" alt="SWAT Kats: The Radical Squadron">
+					<div class="menu anim" style="--d:2.3s" id="menu"></div>
+					<div id="status-notice"></div>
+					<div class="fine">Unofficial non-commercial fan game · SWAT Kats and its characters © their owners · T-Bone &amp; Razor art by Feno (fan art)</div>
+				</section>
+				<section class="panel p-villain anim" style="--d:0.25s; --r:4deg">
+					<div class="burst"></div>
+					<img class="char anim" style="--d:0.45s" src="launch/dark_kat.png" alt="Dark Kat">
+					<div class="bubble pop anim" style="--d:0.7s; left:4%; top:44%; max-width:52%; --tail:70%; --skew:-30deg">Megakat City will be MINE!</div>
+				</section>
+				<section class="panel p-turmoil anim" style="--d:0.7s; --r:-2deg">
+					<div class="burst"></div>
+					<img class="char anim" style="--d:0.88s" src="launch/turmoil.png" alt="Commander Turmoil">
+					<div class="caption pop anim" style="--d:1.05s; right:8px; top:8px">Turmoil's armada approaches</div>
+				</section>
 			</div>
-			<div class="bars" aria-hidden="true"></div>
-			<div class="comm">
-				<div class="face"><img id="radio-face" src="launch/face_tbone.png" alt=""></div>
-				<div class="quote" aria-live="polite">
-					<div class="who-name" id="radio-who">T-Bone</div>
-					<div class="line" id="radio-line">Hatch is open. Spinning up the turbines.</div>
-				</div>
-				<div class="gauge">
-					<div class="bar indeterminate" id="bar"><i></i></div>
-					<div class="pct" id="pct">SPOOLING UP</div>
-				</div>
-			</div>
-			<div class="fine">Unofficial non-commercial fan game · SWAT Kats and its characters © their owners · T-Bone &amp; Razor art by Feno (fan art)</div>
-			<div id="status-notice"></div>
+			<div class="sheet-back" id="sheet-back" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 			<button class="sound" id="sound-toggle" type="button" aria-pressed="false"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span><span id="sound-label">SOUND ON</span></button>
 		</div>
-		<!-- Theme music lives outside the loading overlay so it keeps playing into the game. -->
+		<!-- Theme music lives outside the launcher so it keeps playing into the game. -->
 		<audio id="sk-music" src="launch/big_trouble.mp3" loop preload="auto"></audio>
 
 		<script src="$GODOT_URL"></script>
@@ -238,8 +253,8 @@ const GODOT_CONFIG = $GODOT_CONFIG;
 const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
 const engine = new Engine(GODOT_CONFIG);
 
-// Theme music. Starts on the loading screen and keeps playing into the game, which
-// drives it through window.skMusic (see scripts/autoload/music.gd).
+// Theme music. Starts on the launcher and keeps playing into the game, which drives it
+// through window.skMusic (see scripts/autoload/music.gd).
 window.skMusic = (function () {
 	const audio = document.getElementById('sk-music');
 	const button = document.getElementById('sound-toggle');
@@ -251,11 +266,9 @@ window.skMusic = (function () {
 
 	function render() {
 		const playing = !audio.paused && !muted;
-		if (button) {
-			button.classList.toggle('on', playing);
-			button.setAttribute('aria-pressed', String(playing));
-			label.textContent = playing ? 'SOUND OFF' : 'SOUND ON';
-		}
+		button.classList.toggle('on', playing);
+		button.setAttribute('aria-pressed', String(playing));
+		label.textContent = playing ? 'SOUND OFF' : 'SOUND ON';
 	}
 	function fadeTo(volume, seconds) {
 		target = volume;
@@ -302,136 +315,242 @@ window.skMusic = (function () {
 		}
 	}
 	UNLOCK_EVENTS.forEach((e) => document.addEventListener(e, unlock, true));
-	if (button) {
-		button.addEventListener('click', (ev) => {
-			ev.stopPropagation();
-			if (audio.paused || muted) {
-				muted = false;
-				fadeTo(target || 0.7, 1.5);
-			} else {
-				setMuted(true);
-			}
-		});
-	}
+	button.addEventListener('click', (ev) => {
+		ev.stopPropagation();
+		if (audio.paused || muted) {
+			muted = false;
+			fadeTo(target || 0.7, 1.5);
+		} else {
+			setMuted(true);
+		}
+	});
 	audio.addEventListener('play', render);
 	audio.addEventListener('pause', render);
 	fadeTo(target, 2.5); // try to autoplay with a fade-in
 	return { fadeTo, setMuted };
 }());
 
-// Art that fails to load drops out of the composition.
-document.querySelectorAll('#status img').forEach((img) => {
-	const hide = () => (img.closest('.villain, .heroes, .logo, .face') || img).classList.add('missing');
-	if (img.complete && img.naturalWidth === 0) {
-		hide();
+// The comic-page launcher. The game calls show(state) when it is ready (and whenever it returns
+// to the title) and hide() when a stage launches; the page calls window.skGameLaunch(id) and
+// window.skGameSetting(key, value) (scripts/autoload/web_launcher.gd).
+window.skLauncher = (function () {
+	const root = document.getElementById('launcher');
+	const menu = document.getElementById('menu');
+	const back = document.getElementById('sheet-back');
+	const sheet = document.getElementById('sheet');
+	const canvas = document.getElementById('canvas');
+	// Shown while the game downloads; replaced by the game's own list when it is ready.
+	let state = {
+		episodes: [
+			{ id: 'ep01', number: 'Episode 1', title: 'Dark Skies Over Megakat', playable: true, best: 0 },
+			{ id: 'free', number: 'Free Flight', title: 'Endless Defense', playable: true, best: 0 },
+			{ id: 'ep02', number: 'Episode 2', title: 'Turmoil Rising', playable: false, best: 0 },
+		],
+		settings: { invert_pitch: false, missile_cam: true },
+	};
+	let ready = false;
+	let progress = -1; // -1 = indeterminate
+	const PORTRAITS = { 'Dark Kat': 'dark_kat', 'Turmoil': 'turmoil' };
+	const CONTROLS = [
+		['Pitch / Roll', 'Arrow keys', 'Left stick'],
+		['Rudder', 'A / D', 'Right stick'],
+		['Throttle', 'W / S', 'RT / LT'],
+		['Afterburner', 'Shift', 'RB'],
+		['Cannon', 'Space / Left click', 'A'],
+		['Blowtorch homing missile', 'F / Right click', 'B'],
+		['Fire special missile', 'R', 'X'],
+		['Next special missile', 'Q', 'LB'],
+		['Airbrake', 'Hold S at idle', 'Hold LT at idle'],
+		['Camera', 'C', 'Y'],
+		['Invert pitch · Mute · Pause', 'Y · M · Esc', 'Start'],
+	];
+
+	function el(tag, attrs, ...children) {
+		const e = document.createElement(tag);
+		Object.entries(attrs || {}).forEach(([k, v]) => {
+			if (k === 'onclick') e.addEventListener('click', v);
+			else if (k === 'class') e.className = v;
+			else e.setAttribute(k, v);
+		});
+		children.forEach((c) => e.append(c));
+		return e;
 	}
+
+	function renderMenu() {
+		menu.replaceChildren();
+		if (!ready) {
+			const box = el('div', { class: 'loading' + (progress < 0 ? ' indeterminate' : '') },
+				el('span', {}, progress < 0 ? 'Spooling up the turbines…' : 'Spooling turbines ' + progress + '%'),
+				el('div', { class: 'bar' }, el('i', { style: progress < 0 ? '' : 'width:' + progress + '%' })));
+			menu.append(box);
+		}
+		const playable = state.episodes.filter((e) => e.playable);
+		const soon = state.episodes.filter((e) => !e.playable).slice(0, 1);
+		playable.forEach((ep, i) => {
+			const label = el('span', {}, ep.number + ' · ' + ep.title);
+			const right = el('span', { class: 'best' }, ep.best > 0 ? '★ ' + ep.best : '▶');
+			menu.append(el('button', { class: i === 0 ? 'primary' : '', type: 'button', onclick: () => briefing(ep) }, label, right));
+		});
+		soon.forEach((ep) => {
+			menu.append(el('button', { class: 'soon', type: 'button', disabled: '' }, el('span', {}, ep.number + ' · ' + ep.title), el('span', {}, 'Soon')));
+		});
+		menu.append(el('div', { class: 'row' },
+			el('button', { type: 'button', onclick: controls }, 'Controls'),
+			el('button', { type: 'button', onclick: settings }, 'Settings')));
+		menu.querySelectorAll('button:not(.soon)').forEach((b) => {
+			if (!ready && !b.closest('.row')) b.disabled = true;
+		});
+	}
+
+	function openSheet(...children) {
+		sheet.replaceChildren(...children);
+		back.hidden = false;
+		const first = sheet.querySelector('button.primary, button, input');
+		if (first) first.focus();
+	}
+	function closeSheet() {
+		back.hidden = true;
+		const first = menu.querySelector('button:not(:disabled)');
+		if (first) first.focus();
+	}
+	back.addEventListener('click', (ev) => { if (ev.target === back) closeSheet(); });
+	document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !back.hidden) closeSheet(); });
+
+	function briefing(ep) {
+		const who = el('div', { class: 'who' });
+		if (PORTRAITS[ep.villain]) who.append(el('img', { src: 'launch/face_' + PORTRAITS[ep.villain] + '.png', alt: '' }));
+		if (ep.villain) who.append(el('span', {}, 'Villain: ' + ep.villain));
+		openSheet(
+			el('div', { class: 'kicker' }, ep.number),
+			el('h2', {}, ep.title),
+			who,
+			el('p', {}, ep.story || ''),
+			el('div', { class: 'kicker' }, 'Objectives'),
+			el('ul', {}, ...(ep.objectives || []).map((o) => el('li', {}, o))),
+			el('div', { class: 'actions' },
+				el('button', { class: 'primary', type: 'button', onclick: () => launch(ep) }, 'Launch the TurboKat!'),
+				el('button', { type: 'button', onclick: closeSheet }, 'Back')));
+	}
+
+	function controls() {
+		const rows = CONTROLS.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))));
+		openSheet(
+			el('h2', {}, 'Controls'),
+			el('table', {}, el('tr', {}, el('th', {}, 'Action'), el('th', {}, 'Keyboard / Mouse'), el('th', {}, 'Gamepad')), ...rows),
+			el('p', {}, 'Missiles lock on by themselves: keep a target in front of you until the diamond turns red.'),
+			el('div', { class: 'actions' }, el('button', { type: 'button', onclick: closeSheet }, 'Got it')));
+	}
+
+	function settings() {
+		const toggle = (key, title, hint) => {
+			const box = el('input', { type: 'checkbox' });
+			box.checked = !!state.settings[key];
+			box.disabled = !ready;
+			box.addEventListener('change', () => {
+				state.settings[key] = box.checked;
+				if (window.skGameSetting) window.skGameSetting(key, box.checked);
+			});
+			return el('label', {}, el('span', {}, title, el('small', {}, hint)), box);
+		};
+		openSheet(
+			el('h2', {}, 'Settings'),
+			toggle('invert_pitch', 'Invert pitch', 'Push forward to climb, like a flight stick.'),
+			toggle('missile_cam', 'Missile launch shot', 'A short slow-motion shot when you fire a special missile.'),
+			el('div', { class: 'actions' }, el('button', { type: 'button', onclick: closeSheet }, 'Done')));
+	}
+
+	function launch(ep) {
+		back.hidden = true;
+		hide();
+		if (window.skGameLaunch) window.skGameLaunch(ep.id);
+	}
+
+	function replayOpening() {
+		root.classList.remove('open', 'skip');
+		void root.offsetWidth; // restart the animations
+		root.classList.add('open');
+	}
+
+	function show(newState) {
+		state = newState || state;
+		ready = true;
+		const wasHidden = root.hidden;
+		root.hidden = false;
+		root.classList.remove('leaving');
+		if (wasHidden) replayOpening();
+		renderMenu();
+		const first = menu.querySelector('button:not(:disabled)');
+		if (first) first.focus({ preventScroll: true });
+	}
+
+	function hide() {
+		if (root.hidden || root.classList.contains('leaving')) return;
+		root.classList.add('leaving');
+		setTimeout(() => {
+			root.hidden = true;
+			root.classList.remove('leaving');
+			canvas.focus();
+		}, 450);
+	}
+
+	function setProgress(p) {
+		if (ready || p === progress) return;
+		progress = p;
+		renderMenu();
+	}
+
+	// Skip the opening on any click or key.
+	['pointerdown', 'keydown'].forEach((ev) => root.addEventListener(ev, () => root.classList.add('skip')));
+	renderMenu();
+	return { show, hide, setProgress };
+}());
+
+// Megakat skyline silhouette for the centre panel.
+(function () {
+	const svg = document.getElementById('city');
+	let x = 0;
+	let html = '';
+	let seed = 7;
+	const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+	while (x < 1000) {
+		const w = 26 + rnd() * 50;
+		const h = 90 + rnd() * 260;
+		html += `<rect x="${x}" y="${400 - h}" width="${w}" height="${h}" fill="#1a1230" stroke="#0c0b10" stroke-width="3"/>`;
+		for (let wy = 400 - h + 12; wy < 390; wy += 16) {
+			for (let wx = x + 6; wx < x + w - 8; wx += 11) {
+				if (rnd() < 0.35) html += `<rect x="${wx}" y="${wy}" width="5" height="7" fill="#ffd27a"/>`;
+			}
+		}
+		x += w + 2;
+	}
+	svg.innerHTML = html;
+}());
+
+// Art that fails to load drops out of the page.
+document.querySelectorAll('#launcher img').forEach((img) => {
+	const hide = () => img.classList.add('missing');
+	if (img.complete && img.naturalWidth === 0) hide();
 	img.addEventListener('error', hide);
 });
 
-// Radio chatter shown while the game downloads: [speaker, portrait, line].
-const RADIO = [
-	['T-Bone', 'tbone', 'Hatch is open. Spinning up the turbines.'],
-	['Razor', 'razor', 'Missiles loaded. Mega-Missile armed and ready.'],
-	['Callie Briggs', 'callie', 'SWAT Kats, Megakat City needs you. Now!'],
-	['Dark Kat', 'dark_kat', 'Tonight, Megakat City kneels before me.'],
-	['T-Bone', 'tbone', 'Hang on to your tail, buddy!'],
-	['Turmoil', 'turmoil', 'My fortress is ready. Let them come.'],
-	['Razor', 'razor', 'Radar is hot. Creeplings inbound from the bay.'],
-];
-// Warm the portrait cache so swaps are instant.
-RADIO.forEach((r) => { new Image().src = 'launch/face_' + r[1] + '.png'; });
-
 (function () {
-	const statusOverlay = document.getElementById('status');
-	const statusNotice = document.getElementById('status-notice');
-	const bar = document.getElementById('bar');
-	const fill = bar.firstElementChild;
-	const pct = document.getElementById('pct');
-	const face = document.getElementById('radio-face');
-	const quote = face.closest('.comm');
-	const who = document.getElementById('radio-who');
-	const line = document.getElementById('radio-line');
-
-	let initializing = true;
-	let statusMode = '';
-	let radioIndex = 0;
-	const radioTimer = setInterval(() => {
-		radioIndex = (radioIndex + 1) % RADIO.length;
-		const [name, portrait, text] = RADIO[radioIndex];
-		who.textContent = name;
-		line.textContent = text;
-		face.src = 'launch/face_' + portrait + '.png';
-		[face, who, line].forEach((el) => {
-			el.classList.remove('swap');
-			void el.offsetWidth; // restart the animation
-			el.classList.add('swap');
-		});
-	}, 3000);
-
-	function setStatusMode(mode) {
-		if (statusMode === mode || !initializing) {
-			return;
-		}
-		if (mode === 'hidden') {
-			clearInterval(radioTimer);
-			// The sound button leaves with the overlay; the game's M key mutes from here on.
-			statusOverlay.remove();
-			initializing = false;
-			return;
-		}
-		statusOverlay.style.visibility = 'visible';
-		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
-		statusMode = mode;
-	}
-
-	function setStatusNotice(text) {
-		while (statusNotice.lastChild) {
-			statusNotice.removeChild(statusNotice.lastChild);
-		}
-		text.split('\n').forEach((l) => {
-			statusNotice.appendChild(document.createTextNode(l));
-			statusNotice.appendChild(document.createElement('br'));
-		});
-	}
-
+	const notice = document.getElementById('status-notice');
 	function displayFailureNotice(err) {
 		console.error(err);
-		if (err instanceof Error) {
-			setStatusNotice(err.message);
-		} else if (typeof err === 'string') {
-			setStatusNotice(err);
-		} else {
-			setStatusNotice('An unknown error occurred.');
-		}
-		setStatusMode('notice');
-		initializing = false;
+		const text = err instanceof Error ? err.message : (typeof err === 'string' ? err : 'An unknown error occurred.');
+		notice.replaceChildren(...text.split('\n').flatMap((l) => [document.createTextNode(l), document.createElement('br')]));
+		notice.style.display = 'block';
 	}
-
-	const missing = Engine.getMissingFeatures({
-		threads: GODOT_THREADS_ENABLED,
-	});
-
+	const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
 	if (missing.length !== 0) {
-		const missingMsg = 'This browser is missing features the game needs:\n';
-		displayFailureNotice(missingMsg + missing.join('\n') + '\nTry the latest Chrome, Edge or Firefox on a desktop computer.');
-	} else {
-		setStatusMode('progress');
-		engine.startGame({
-			'onProgress': function (current, total) {
-				if (current > 0 && total > 0) {
-					const p = Math.min(100, Math.round((current / total) * 100));
-					bar.classList.remove('indeterminate');
-					fill.style.width = p + '%';
-					pct.textContent = 'SPOOLING TURBINES ' + p + '%';
-				} else {
-					bar.classList.add('indeterminate');
-					pct.textContent = 'SPOOLING UP';
-				}
-			},
-		}).then(() => {
-			setStatusMode('hidden');
-		}, displayFailureNotice);
+		displayFailureNotice('This browser is missing features the game needs:\n' + missing.join('\n') + '\nTry the latest Chrome, Edge or Firefox on a desktop computer.');
+		return;
 	}
+	engine.startGame({
+		'onProgress': function (current, total) {
+			window.skLauncher.setProgress(current > 0 && total > 0 ? Math.min(100, Math.round((current / total) * 100)) : -1);
+		},
+	}).catch(displayFailureNotice);
 }());
 		</script>
 	</body>

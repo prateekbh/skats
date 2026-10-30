@@ -1,5 +1,6 @@
 extends Node
-## Builds the world and runs the game state machine: TITLE → PLAYING ⇄ PAUSED → DEBRIEF.
+## Builds the world and runs the game state machine: TITLE → INTRO (hatch launch) → PLAYING ⇄ PAUSED
+## → DEBRIEF. On the web the title is the comic-page launcher in web/shell.html (see WebLauncher).
 ##
 ## Command-line options (after `--`), used for automated testing:
 ##   --autotest            start Episode 1 with an autopilot that fights and prints status
@@ -14,6 +15,7 @@ extends Node
 ##   --fxshow=<dir>        photograph explosions and effects at several moments, then quit
 ##   --weaponshow=<dir>    photograph the special-missile models and their effects, then quit
 ##   --showcase=<dir>      photograph the TurboKat from several angles into <dir>, then quit
+##   --jetrender=<png>     render the TurboKat in flight on a transparent background, then quit
 
 enum State { INTRO, TITLE, PLAYING, PAUSED, DEBRIEF }
 
@@ -62,14 +64,14 @@ func _ready() -> void:
 		_fx_showcase.call_deferred()
 	elif _opts.has("weaponshow"):
 		_weapon_showcase.call_deferred()
-	elif _opts.has("hangarjet"):
-		_hangar_jet.call_deferred()
+	elif _opts.has("jetrender"):
+		_jet_render.call_deferred()
 	elif _autotest:
 		start_episode(Game.episode_by_id(_opts.get("episode", "ep01")))
-	elif _opts.has("snap") and not _opts.has("intro"):
-		_show_title()
-	else:
+	elif _opts.has("snap") and _opts.has("intro"):
 		_start_intro()
+	else:
+		_show_title()
 
 
 # --- world ------------------------------------------------------------------------
@@ -145,7 +147,8 @@ func _build_ui() -> void:
 	combat.on_message = func(t: String): hud.message(t, 2.0)
 	menu = Menu.new()
 	layer.add_child(menu)
-	menu.launch.connect(start_episode)
+	menu.launch.connect(launch_episode)
+	WebLauncher.launch_requested.connect(func(id: String): launch_episode(Game.episode_by_id(id)))
 	menu.resume.connect(_resume)
 	menu.restart.connect(func(): start_episode(episode))
 	menu.quit_to_title.connect(_show_title)
@@ -192,6 +195,8 @@ func hit_stop(real_seconds: float) -> void:
 const MCAM_SLOWMO := 0.3
 const MCAM_TIME := 1.1 # unscaled seconds
 var _mcam := {}
+## The stage waiting for the hatch launch to finish.
+var _launch_ep := {}
 
 
 func _on_special_fired(missiles: Array, def: Dictionary) -> void:
@@ -244,9 +249,22 @@ func _show_title() -> void:
 	player.reset(Vector3(900, 320, 0), Vector3(900, 320, -100))
 	player.player_control = false
 	camera.shot = "orbit"
-	menu.show_title()
+	if WebLauncher.active:
+		menu.hide_all()
+		WebLauncher.show()
+	else:
+		menu.show_title()
 	if not _autotest:
 		Music.play_theme()
+
+
+## A stage was chosen: the TurboKat launches from the hatch, then the mission starts.
+func launch_episode(ep: Dictionary) -> void:
+	if ep.is_empty() or not ep.playable:
+		return
+	_launch_ep = ep
+	WebLauncher.hide()
+	_start_intro()
 
 
 func start_episode(ep: Dictionary) -> void:
@@ -447,10 +465,9 @@ func _showcase() -> void:
 	get_tree().quit()
 
 
-## --hangarjet=<png>: our TurboKat parked in the launch-screen hangar, rendered alone on a
-## transparent background from the angle of the hangar backdrop (tools/prepare_hangar_art.py),
-## under hangar lighting: a cool teal fill and a warm overhead work light.
-func _hangar_jet() -> void:
+## --jetrender=<png>: our TurboKat banked in flight, rendered alone on a transparent background
+## for the launch page (tools/render_launch_art.py crops it to web/launch/turbokat_hero.png).
+func _jet_render() -> void:
 	_show_title()
 	menu.hide_all()
 	hud.visible = false
@@ -461,8 +478,6 @@ func _hangar_jet() -> void:
 	player.global_position = at
 	player.global_transform.basis = Basis()
 	player.speed = 0.0
-	player.throttle = 0.0
-	player.boosting = false
 	player._effects(0.016)
 	for n in world.get_children():
 		if n is WorldEnvironment:
@@ -478,63 +493,28 @@ func _hangar_jet() -> void:
 			n.rotation_degrees = Vector3(-62, -150, 0)
 	get_viewport().transparent_bg = true
 	get_viewport().msaa_3d = Viewport.MSAA_4X
-	if _opts.get("jetpose", "") == "hero":
-		# In flight for the launch page: banked into a turn, seen from low at the front-left.
-		# The airframe is measured before the afterburner effects light up.
-		var hb := AABB()
-		var hfirst := true
-		for vi in player.find_children("*", "MeshInstance3D", true, false):
-			if (vi as VisualInstance3D).is_visible_in_tree():
-				var b: AABB = vi.global_transform * (vi as VisualInstance3D).get_aabb()
-				hb = b if hfirst else hb.merge(b)
-				hfirst = false
-		player.throttle = 1.0
-		player.boosting = true
-		player._effects(0.016)
-		player.global_transform.basis = Basis(Vector3.FORWARD, deg_to_rad(-24)) * Basis(Vector3.RIGHT, deg_to_rad(6))
-		var hl := hb.size.z
-		camera.shot = "script"
-		camera.fov = 24.0
-		camera.global_position = hb.get_center() + Vector3(-hl * 0.62, -hl * 0.15, -hl * 0.78)
-		camera.look_at(hb.get_center(), Vector3.UP)
-		for i in 4:
-			await get_tree().process_frame
-		get_viewport().get_texture().get_image().save_png(_opts.hangarjet)
-		print("[hangarjet] saved ", _opts.hangarjet)
-		get_tree().quit()
-		return
-	# Parked: landing gear (the flight model has none), sized from the airframe's bounds.
+	# Measure the airframe before the afterburner effects light up.
 	var box := AABB()
 	var first := true
-	for vi in player.find_children("*", "VisualInstance3D", true, false):
-		if not (vi as VisualInstance3D).is_visible_in_tree():
-			continue
-		var b: AABB = vi.global_transform * (vi as VisualInstance3D).get_aabb()
-		box = b if first else box.merge(b)
-		first = false
-	var gear_mat := MeshKit.toon(Color(0.55, 0.58, 0.62), 0.6, 0.4)
-	var tyre_mat := MeshKit.toon(Color(0.08, 0.08, 0.1), 0.0, 0.8)
-	var len := box.size.z
-	var floor_y := box.position.y - len * 0.07
-	for g in [[0.0, 0.2], [-0.16, 0.66], [0.16, 0.66]]:
-		var x: float = box.get_center().x + box.size.x * g[0]
-		var z: float = box.position.z + len * g[1]
-		var top := box.position.y + box.size.y * 0.25
-		var strut := MeshKit.part(player, MeshKit.cyl(len * 0.012, len * 0.012, top - floor_y, 8), gear_mat,
-			player.to_local(Vector3(x, (top + floor_y) * 0.5, z)))
-		strut.global_basis = Basis()
-		var wheel := MeshKit.part(player, MeshKit.cyl(len * 0.032, len * 0.032, len * 0.028, 16), tyre_mat,
-			player.to_local(Vector3(x, floor_y + len * 0.032, z)))
-		wheel.global_basis = Basis(Vector3.FORWARD, PI / 2)
-	var c := box.get_center()
+	for vi in player.find_children("*", "MeshInstance3D", true, false):
+		if (vi as VisualInstance3D).is_visible_in_tree():
+			var b: AABB = vi.global_transform * (vi as VisualInstance3D).get_aabb()
+			box = b if first else box.merge(b)
+			first = false
+	player.throttle = 1.0
+	player.boosting = true
+	player._effects(0.016)
+	# Banked into a turn, seen from low at the front-left.
+	player.global_transform.basis = Basis(Vector3.FORWARD, deg_to_rad(-24)) * Basis(Vector3.RIGHT, deg_to_rad(6))
+	var length := box.size.z
 	camera.shot = "script"
 	camera.fov = 24.0
-	camera.global_position = c + Vector3(-len * 1.55, len * 0.42, -len * 1.35)
-	camera.look_at(c + Vector3(0, -len * 0.04, 0), Vector3.UP)
+	camera.global_position = box.get_center() + Vector3(-length * 0.62, -length * 0.15, -length * 0.78)
+	camera.look_at(box.get_center(), Vector3.UP)
 	for i in 4:
 		await get_tree().process_frame
-	get_viewport().get_texture().get_image().save_png(_opts.hangarjet)
-	print("[hangarjet] saved ", _opts.hangarjet)
+	get_viewport().get_texture().get_image().save_png(_opts.jetrender)
+	print("[jetrender] saved ", _opts.jetrender)
 	get_tree().quit()
 
 
@@ -628,7 +608,12 @@ func _finish_intro() -> void:
 	player.boosting = false
 	city.set_hatch(0.0)
 	Sfx.set_engine(false, 0, 0)
-	_show_title()
+	if not _launch_ep.is_empty():
+		var ep := _launch_ep
+		_launch_ep = {}
+		start_episode(ep)
+	else:
+		_show_title()
 
 
 ## Sets off effects in front of a fixed camera and saves frames at set moments.

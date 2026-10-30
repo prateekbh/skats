@@ -38,7 +38,7 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
 ## What's in v0.1
 
 - **The TurboKat:** a community 3D model painted in the show's colours (glossy black, red cockpit pod with royal-blue glass, blue wingtips and nose, red engines with spinning turbines). Its wings swing back at high speed and spread open when slow, and it's cel-shaded with cartoon outlines. A procedural fallback airframe is built if the model files are missing.
-- **Launch sequence:** a themed browser loading screen (searchlights, TurboKat flyby, radio chatter, turbine spool-up gauge), then an in-game intro where the salvage-yard hatch opens, the TurboKat rises out and blasts off as the logo slams in.
+- **Launcher:** a comic-book page. Razor and T-Bone, Callie, Dark Kat and Turmoil in ink-bordered panels around a big centre panel with our TurboKat over Megakat City and the menu (stages, briefings, controls, settings). The panels slam in one by one on open while "Big Trouble" plays, and the game loads behind the page. Choosing a stage plays the launch: the salvage-yard hatch opens and the TurboKat bursts out and climbs away over the city.
 - **Arcade flight model:** bank-to-turn, auto-level, afterburner, speed gained in dives and lost in climbs.
 - **Weapons:** twin cannons with overheat, Blowtorch homing missiles, and a rack of the show's
   special missiles (from the swatkats.info weapons catalogue): the **Octopus** (captures a target),
