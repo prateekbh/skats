@@ -16,7 +16,8 @@ void fragment() {
 	vec3 n = normalize(vec3(cos(p.x * 0.031 + t * 0.9) * 0.08 * (1.0 - calm), 1.0, cos(p.y * 0.047 - t * 1.3) * 0.08 * (1.0 - calm)));
 	NORMAL = (VIEW_MATRIX * vec4(n, 0.0)).xyz;
 	float shade = mix(w * 0.28 + 0.5, 0.5, calm);
-	ALBEDO = mix(vec3(0.04, 0.12, 0.2), vec3(0.08, 0.22, 0.32), shade);
-	METALLIC = 0.3;
-	ROUGHNESS = mix(0.12, 0.35, calm);
+	ALBEDO = mix(vec3(0.05, 0.28, 0.42), vec3(0.14, 0.52, 0.64), shade);
+	METALLIC = 0.0;
+	SPECULAR = 0.9;
+	ROUGHNESS = mix(0.06, 0.25, calm);
 }

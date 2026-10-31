@@ -190,7 +190,7 @@ void fragment() {
 		float win = step(0.07, f.x) * step(f.x, 0.93) * step(0.1, f.y) * step(f.y, 0.9);
 		winm = win; wf = f; wb = vec4(0.07, 0.93, 0.1, 0.9);
 		float on = step(0.7, hash(id + seed * 113.0));
-		vec3 glass = mix(wall * 0.72, vec3(0.06, 0.1, 0.18), 0.15);
+		vec3 glass = mix(wall * 0.85, vec3(0.3, 0.46, 0.7), 0.3);
 		float refl = smoothstep(0.35, 1.0, sin(v * 0.035 + u * 0.012 + seed * 20.0));
 		glass += vec3(0.32, 0.16, 0.1) * refl * 0.7 + vec3(0.1, 0.18, 0.28) * smoothstep(0.0, 1.0, v / max(part_h, 1.0)) * 0.5;
 		alb = mix(wall * 0.35, glass, win);
@@ -350,13 +350,17 @@ void fragment() {
 		emi = emi * step(0.75, hash(floor(vec2(u, v) / 3.0) + seed)) * vec3(1.0, 0.45, 0.12) * flicker;
 		metal = 0.0;
 	}
+	// Far away the window grid would shimmer: fade it to its average tone (and the glints out).
+	float far = smoothstep(450.0, 2000.0, length(VERTEX)) * (top_face ? 0.0 : 1.0);
+	alb = mix(alb, wall * 0.66 + vec3(0.03, 0.035, 0.05), far * 0.8);
+	emi *= 1.0 - far * 0.85;
 	if (st == 13) {
 		alb = vec3(0.05, 0.05, 0.06);
 		metal = 0.3;
 		rough = 0.6;
 	}
 	ALBEDO = alb * (1.0 - dent * 0.6) * (top_face || st == 7 || st == 8 ? 1.0 : 1.18);
-	EMISSION = emi;
+	EMISSION = emi * 0.5; // daylight: lit windows are a glint, not a glow
 	ROUGHNESS = rough;
 	METALLIC = metal;
 }

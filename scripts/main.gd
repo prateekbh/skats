@@ -112,39 +112,51 @@ func _build_world() -> void:
 	world.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(world)
 
+	# Late-afternoon golden hour: deep blue overhead, hazy pale horizon, warm low sun.
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.09, 0.09, 0.26)
-	sky_mat.sky_horizon_color = Color(0.98, 0.52, 0.4)
-	sky_mat.sky_curve = 0.12
-	sky_mat.ground_horizon_color = Color(0.55, 0.32, 0.34)
-	sky_mat.ground_bottom_color = Color(0.07, 0.05, 0.09)
-	sky_mat.sun_angle_max = 25.0
+	sky_mat.sky_top_color = Color(0.1, 0.27, 0.72)
+	sky_mat.sky_horizon_color = Color(0.74, 0.84, 0.97)
+	sky_mat.sky_curve = 0.2
+	sky_mat.ground_horizon_color = Color(0.62, 0.7, 0.82)
+	sky_mat.ground_bottom_color = Color(0.2, 0.28, 0.4)
+	sky_mat.sun_angle_max = 28.0
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.75
+	env.ambient_light_energy = 0.95
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.6, 0.38, 0.42)
-	env.fog_density = 0.00011
-	env.fog_sky_affect = 0.15
+	env.fog_light_color = Color(0.62, 0.74, 0.92)
+	env.fog_density = 0.00013
+	env.fog_sky_affect = 0.25
 	env.glow_enabled = true
-	env.glow_intensity = 0.75
-	env.glow_bloom = 0.05
-	env.glow_hdr_threshold = 0.9
+	env.glow_intensity = 0.55
+	env.glow_bloom = 0.04
+	env.glow_hdr_threshold = 1.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	world.add_child(we)
 
-	# Low dusk sun over the western mountains.
+	# Low golden sun over the western mountains.
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color(1.0, 0.76, 0.56)
-	sun.light_energy = 1.15
-	sun.rotation_degrees = Vector3(-16, -105, 0)
+	sun.light_color = Color(1.0, 0.86, 0.66)
+	sun.light_energy = 1.55
+	sun.rotation_degrees = Vector3(-30, -105, 0)
 	world.add_child(sun)
+	var cloud := MeshInstance3D.new()
+	var cp := PlaneMesh.new()
+	cp.size = Vector2(60000, 60000)
+	cloud.mesh = cp
+	var cmat := ShaderMaterial.new()
+	cmat.shader = load("res://shaders/clouds.gdshader")
+	cloud.material_override = cmat
+	cloud.position = Vector3(0, 1700, 0)
+	cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	cloud.extra_cull_margin = 16384.0
+	world.add_child(cloud)
 
 	city = City.new()
 	world.add_child(city)
