@@ -8,7 +8,7 @@ signal destroyed
 signal phase_changed(phase: int)
 
 const ORBIT_RADIUS := 680.0
-const ALTITUDE := 330.0
+const ALTITUDE := 430.0
 const CRUISE_SPEED := 24.0
 const HULL_HALF_LENGTH := 100.0
 const HULL_RADIUS := 31.0
@@ -19,6 +19,8 @@ var turrets: Array[Turret] = []
 var phase := 0
 ## Called with a world position when the ship wants to launch a glider in phase 2.
 var spawn_glider: Callable
+## What the ship circles (set by the mission before setup): Enforcer HQ in Episode 1.
+var center := Vector3.ZERO
 
 var _angle := 0.0
 var _approach := 1.0
@@ -142,7 +144,7 @@ func _place(dt: float) -> void:
 	_angle += dt * CRUISE_SPEED / ORBIT_RADIUS
 	_approach = maxf(0.0, _approach - dt / 18.0)
 	var r := ORBIT_RADIUS + _approach * 1800.0
-	var pos := Vector3(cos(_angle) * r, ALTITUDE + _approach * 150.0, sin(_angle) * r)
+	var pos := center + Vector3(cos(_angle) * r, ALTITUDE + _approach * 150.0, sin(_angle) * r)
 	var tangent := Vector3(-sin(_angle), 0, cos(_angle))
 	global_position = pos
 	look_at(pos + tangent - Vector3(cos(_angle), 0, sin(_angle)) * _approach * 3.0, Vector3.UP)

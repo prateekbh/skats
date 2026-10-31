@@ -43,7 +43,8 @@ func _next_wave() -> void:
 	wave += 1
 	var player: TurboKat = main.player
 	var a := randf() * TAU
-	var center := Vector3(cos(a) * 600.0, randf_range(220.0, 420.0), sin(a) * 600.0)
+	var c: Vector3 = main.city.downtown_pos
+	var center := c + Vector3(cos(a) * 1500.0, randf_range(280.0, 480.0), sin(a) * 1500.0)
 	if player.alive:
 		center = (center + player.global_position) * 0.5 + Vector3(0, 120, 0)
 	spawn_wave(center, 4 + wave * 2, wave / 2)

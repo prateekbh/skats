@@ -20,6 +20,10 @@ extends Node
 ##   --showcase=<dir>      photograph the TurboKat from several angles into <dir>, then quit
 ##   --jetrender=<png>     render the TurboKat in flight on a transparent background, then quit
 ##   --comicshow=<dir>     play Episode 1's comic strips quickly and save every page, then quit
+##   --viewshot=<png>      one frame from --cam=x,y,z looking at --look=x,y,z (metres), then quit
+##   --citymap=<png>       draw a top-down map of the city, then quit (works headless)
+##   --citycheck           print the city report (areas, street gaps, connectivity), then quit
+##   --flytest             fly the real TurboKat controller along street lanes and report crashes
 
 enum State { INTRO, TITLE, PLAYING, PAUSED, DEBRIEF }
 
@@ -36,6 +40,7 @@ var hud: Control
 var menu: Control
 var comic: ComicStrip
 var _comic_gen := 0
+var _flytest := false
 var mission: Mission
 var episode: Dictionary
 
@@ -81,6 +86,12 @@ func _ready() -> void:
 		_jet_render.call_deferred()
 	elif _opts.has("comicshow"):
 		_comic_showcase.call_deferred()
+	elif _opts.has("viewshot"):
+		_view_shot.call_deferred()
+	elif _opts.has("citymap") or _opts.has("citycheck"):
+		_city_tools.call_deferred()
+	elif _opts.has("flytest"):
+		_fly_test.call_deferred()
 	elif _autotest:
 		var ep := Game.episode_by_id(_opts.get("episode", "ep01"))
 		if _opts.has("launch"):
@@ -118,7 +129,7 @@ func _build_world() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.6, 0.38, 0.42)
-	env.fog_density = 0.00028
+	env.fog_density = 0.00011
 	env.fog_sky_affect = 0.15
 	env.glow_enabled = true
 	env.glow_intensity = 0.75
@@ -291,7 +302,8 @@ func _show_title() -> void:
 	_clear_world()
 	mission = null
 	hud.visible = false
-	player.reset(Vector3(900, 320, 0), Vector3(900, 320, -100))
+	var orbit_start := city.downtown_pos + Vector3(CRUISE_RADIUS, CRUISE_ALT, 0)
+	player.reset(orbit_start, orbit_start + Vector3(0, 0, -100))
 	player.player_control = false
 	camera.shot = "orbit"
 	if WebLauncher.active:
@@ -335,6 +347,7 @@ func start_episode(ep: Dictionary, from_launch := false) -> void:
 	var heading := player.forward()
 	var launch_speed := player.speed
 	_clear_world()
+	combat.setup_caches(city.cache_spots)
 	mission = load(ep.script).new()
 	mission.main = self
 	if keep:
@@ -472,6 +485,8 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
+	if _flytest:
+		return
 	if _slowmo_until > 0 and Time.get_ticks_msec() > _slowmo_until:
 		_slowmo_until = 0
 		Engine.time_scale = MCAM_SLOWMO if not _mcam.is_empty() else 1.0
@@ -590,6 +605,113 @@ func _jet_render() -> void:
 	get_tree().quit()
 
 
+## --flytest: flies the real TurboKat controller (not god mode, and without the autopilot's
+## pull-up-over-obstacles help) along street lanes at 70 m, one standard street and the widest
+## avenue per district, and reports whether it got through. A crash means the lane is not
+## flyable at that speed (the handoff says to validate clearances this way).
+func _fly_test() -> void:
+	_flytest = true
+	Engine.time_scale = 3.0
+	_show_title()
+	menu.hide_all()
+	hud.visible = false
+	camera.shot = "script"
+	player.god_mode = false
+	var best_avenue := {}
+	var best_street := {}
+	for lane: Dictionary in city.buildings.lanes:
+		var pool := best_avenue if lane.avenue else best_street
+		var k: String = lane.kind
+		var len := (lane.a as Vector2).distance_to(lane.b)
+		var better: bool = not pool.has(k) or (len > pool[k].len if lane.avenue else (lane.width < pool[k].width and len > 600.0))
+		if better:
+			lane.len = len
+			pool[k] = lane
+	var picks: Array[Dictionary] = []
+	for k in best_avenue:
+		picks.append(best_avenue[k])
+	for k in best_street:
+		picks.append(best_street[k])
+	var clean := 0
+	for lane in picks:
+		var r := await _fly_lane(lane)
+		clean += 1 if r.ok else 0
+		print("[flytest] %-11s %-8s %3.0f m wide, %4.1f km: %s (closest to the ground %.0f m, worst drift from the lane centre %.0f m)" % [
+			lane.kind, "avenue" if lane.avenue else "street", lane.width, lane.len / 1000.0,
+			"OK" if r.ok else "CRASHED at %.0f m along" % r.at, r.min_alt, r.drift])
+		if not r.ok:
+			var la: Vector2 = lane.a
+			var lb: Vector2 = lane.b
+			print("[flytest]   lane (%.0f,%.0f) -> (%.0f,%.0f); ground at the start %.0f m; crash at %s, ground there %.0f m" % [
+				la.x, la.y, lb.x, lb.y, city.height_at(la.x, la.y), str(r.pos.round()), city.height_at(r.pos.x, r.pos.z)])
+	print("[flytest] %d of %d lanes flown clean" % [clean, picks.size()])
+	get_tree().quit()
+
+
+func _fly_lane(lane: Dictionary) -> Dictionary:
+	var a: Vector2 = lane.a
+	var b: Vector2 = lane.b
+	var dir := (b - a).normalized()
+	var y := 70.0
+	var start := Vector3(a.x, y, a.y)
+	player.reset(start, start + Vector3(dir.x, 0, dir.y) * 100.0)
+	player.speed = 190.0
+	player.throttle = 0.6
+	player.player_control = false
+	player.ai = {"pitch": 0.0, "roll": 0.0, "yaw": 0.0, "throttle": 0.6, "fire": false, "missile": false}
+	var length := a.distance_to(b)
+	var t := 0.0
+	var min_alt := INF
+	var drift := 0.0
+	var proj := 0.0
+	while player.alive and t < length / 100.0 + 15.0:
+		await get_tree().process_frame
+		t += get_process_delta_time()
+		var p2 := Vector2(player.global_position.x, player.global_position.z)
+		proj = (p2 - a).dot(dir)
+		if proj >= length - 60.0:
+			break
+		drift = maxf(drift, absf((p2 - a).dot(Vector2(-dir.y, dir.x))))
+		min_alt = minf(min_alt, player.global_position.y - city.height_at(p2.x, p2.y))
+		var carrot := a + dir * minf(proj + 250.0, length)
+		_steer_to(Vector3(carrot.x, y, carrot.y), false)
+	return {"ok": player.alive, "at": proj, "min_alt": min_alt, "drift": drift, "pos": player.global_position}
+
+
+## --viewshot=<png> --cam=x,y,z --look=x,y,z [--fov=n]: one frame from anywhere in the city.
+## Positions are in metres (x east, y up, z south); the HUD and menus are hidden.
+func _view_shot() -> void:
+	_show_title()
+	menu.hide_all()
+	hud.visible = false
+	WebLauncher.hide()
+	player.visible = false
+	var c := String(_opts.get("cam", "0,800,0")).split_floats(",")
+	var l := String(_opts.get("look", "0,0,0")).split_floats(",")
+	camera.shot = "script"
+	camera.fov = float(_opts.get("fov", "68"))
+	camera.global_position = Vector3(c[0], c[1], c[2])
+	camera.look_at(Vector3(l[0], l[1], l[2]), Vector3.UP)
+	for i in 6:
+		await get_tree().process_frame
+	camera.global_position = Vector3(c[0], c[1], c[2])
+	camera.look_at(Vector3(l[0], l[1], l[2]), Vector3.UP)
+	for i in 4:
+		await get_tree().process_frame
+	get_viewport().get_texture().get_image().save_png(_opts.viewshot)
+	print("[viewshot] saved ", _opts.viewshot)
+	get_tree().quit()
+
+
+## --citymap=<png> / --citycheck: draw and measure the city (CityTools), then quit.
+func _city_tools() -> void:
+	if _opts.has("citymap"):
+		CityTools.citymap(city, _opts.citymap)
+	if _opts.has("citycheck"):
+		CityTools.citycheck(city)
+	get_tree().quit()
+
+
 ## --comicshow=<dir>: plays every comic strip of Episode 1 quickly and saves each page.
 func _comic_showcase() -> void:
 	_show_title()
@@ -650,7 +772,7 @@ func _intro_step(delta: float) -> void:
 	var t := _intro_seq
 	var yard := city.salvage_yard_pos
 	var hatch := yard + Vector3(0, 1.5, 0)
-	var flat := Vector3(-yard.x, 0, -yard.z).normalized() # toward downtown
+	var flat := city.launch_dir # toward City Hall
 	city.set_hatch(smoothstep(0.5, 1.4, t))
 
 	# Distance travelled along the launch path, measured from the hatch (negative = still in the tunnel).
@@ -805,26 +927,23 @@ func _weapon_showcase() -> void:
 			get_viewport().get_texture().get_image().save_png("%s/%s_%d.png" % [_opts.weaponshow, shot, int(snap * 100)])
 		combat.clear()
 	# Building damage: two roof hits and a wall hit on a downtown tower, then let the smoke rise.
-	var c0 := city.cell_index(200.0, -150.0)
-	for i in range(city.N / 2 - 6, city.N / 2 + 6):
-		for j in range(city.N / 2 - 6, city.N / 2 + 6):
-			var cc := i * city.N + j
-			if city._instance[cc] >= 0 and city._tier[cc] < 0 and city._block_h[cc] > city._block_h[c0]:
-				c0 = cc
-	var bc := Vector3(city._cx[c0], 0.0, city._cz[c0])
-	var bh: float = city._block_h[c0]
-	combat._missile_hit(Arsenal.HOMING, bc + Vector3(5, bh, 3), null)
-	combat._missile_hit(Arsenal.SPECIALS[4], bc + Vector3(-10, bh, -6), null)
-	combat._missile_hit(Arsenal.HOMING, bc + Vector3(city._hw[c0], bh * 0.25, 4), null)
-	print("[weaponshow] building h=%.0f -> %.0f" % [bh, city._block_h[c0]])
-	camera.global_position = bc + Vector3(120, bh * 0.5, 60)
+	var tb := city.buildings.find_building(city.downtown_pos, 1500.0, 90.0)
+	var bc := Vector3(city.buildings.b_cx[tb], 0.0, city.buildings.b_cz[tb])
+	var bh: float = city.buildings.b_h[tb]
+	var bhw: float = city.buildings.p_xf[city.buildings.b_p0[tb]].basis.get_scale().x * 0.5
+	var roof := CityPlan.LAND + bh
+	combat._missile_hit(Arsenal.HOMING, bc + Vector3(5, roof, 3), null)
+	combat._missile_hit(Arsenal.SPECIALS[4], bc + Vector3(-10, roof, -6), null)
+	combat._missile_hit(Arsenal.HOMING, bc + Vector3(bhw, bh * 0.25, 4), null)
+	print("[weaponshow] building h=%.0f -> %.0f" % [bh, city.buildings.b_h[tb]])
+	camera.global_position = bc + Vector3(bhw + 90.0, bh * 0.5, 60)
 	camera.look_at(bc + Vector3(0, bh * 0.4, 0), Vector3.UP)
 	var bt := 0.0
 	while bt < 3.0:
 		await get_tree().process_frame
 		bt += get_process_delta_time()
 	get_viewport().get_texture().get_image().save_png("%s/building_close.png" % _opts.weaponshow)
-	camera.global_position = bc + Vector3(110, bh + 170, 150)
+	camera.global_position = bc + Vector3(bhw + 160.0, bh + 170, 150)
 	camera.look_at(bc + Vector3(0, bh * 0.55, 0), Vector3.UP)
 	while bt < 9.0:
 		await get_tree().process_frame
@@ -836,16 +955,21 @@ func _weapon_showcase() -> void:
 
 # --- autopilot (title screen flyby and automated tests) -----------------------------
 
-## Flies a wide lazy circle over downtown for the title screen.
+const CRUISE_RADIUS := 1100.0
+const CRUISE_ALT := 560.0
+
+
+## Flies a wide lazy circle around the MegaKat Tower and downtown for the title screen.
 func _cruise() -> void:
+	var c := city.downtown_pos
 	var p := player.global_position
-	var a := atan2(p.z, p.x) + 0.35
-	_steer_to(Vector3(cos(a) * 900.0, 320.0, sin(a) * 900.0))
+	var a := atan2(p.z - c.z, p.x - c.x) + 0.35
+	_steer_to(c + Vector3(cos(a) * CRUISE_RADIUS, CRUISE_ALT, sin(a) * CRUISE_RADIUS))
 	player.ai.fire = false
 	player.ai.throttle = 0.45
 
 
-func _steer_to(point: Vector3) -> Vector3:
+func _steer_to(point: Vector3, avoid := true) -> Vector3:
 	var to := (point - player.global_position).normalized()
 	var local := player.global_transform.basis.inverse() * to
 	var pitch: float
@@ -860,7 +984,7 @@ func _steer_to(point: Vector3) -> Vector3:
 		roll = clampf(roll_err * 1.5, -1.0, 1.0)
 		pitch = 1.0 if absf(roll_err) < 0.6 else 0.25
 	var ahead := player.global_position + player.velocity * 2.5
-	if ahead.y < city.height_at(ahead.x, ahead.z) + 70.0 or player.global_position.y < 90.0:
+	if avoid and (ahead.y < city.height_at(ahead.x, ahead.z) + 70.0 or player.global_position.y < 90.0):
 		pitch = 1.0
 		roll = clampf(-player.global_transform.basis.x.y * 4.0, -1.0, 1.0)
 	player.ai.pitch = pitch
@@ -873,7 +997,7 @@ func _autopilot_fight() -> void:
 	var best: Target = null
 	var best_d := INF
 	for t in combat.targets:
-		if t.alive and t.is_visible_in_tree():
+		if t.alive and t.is_visible_in_tree() and not (t is GroundFlak):
 			var d := t.global_position.distance_to(player.global_position)
 			if t.invulnerable:
 				d *= 3.0
@@ -917,7 +1041,7 @@ func _weapon_test_step(delta: float) -> void:
 	var best_d := 900.0
 	for t in combat.targets:
 		var d := t.global_position.distance_to(player.global_position)
-		if t.alive and t.visible and d < best_d and d > 80.0:
+		if t.alive and t.visible and d < best_d and d > 80.0 and t is Creepling:
 			best = t
 			best_d = d
 	if best == null:

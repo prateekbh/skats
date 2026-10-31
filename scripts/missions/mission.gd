@@ -30,7 +30,7 @@ func objective() -> String:
 ## Player start position and the point the jet faces at launch.
 func start_pose() -> Array:
 	var yard: Vector3 = main.city.salvage_yard_pos
-	return [yard + Vector3(40, 150, 0), Vector3(0, 180, 0)]
+	return [yard + Vector3(40, 150, 0), yard + main.city.launch_dir * 600.0 + Vector3(0, 220, 0)]
 
 
 func step(dt: float) -> void:
@@ -76,6 +76,15 @@ func fail(reason: String) -> void:
 	if not finished:
 		finished = true
 		main.end_mission(false, reason)
+
+
+## " · 4.2 KM" while the nearest enemy is more than a kilometre away, else nothing.
+func far_note() -> String:
+	var near := INF
+	for t in main.combat.targets:
+		if is_instance_valid(t) and t.alive and (t is Creepling):
+			near = minf(near, t.global_position.distance_to(main.player.global_position))
+	return "  ·  %.1f KM" % (near / 1000.0) if near > 1000.0 and near < INF else ""
 
 
 func enemies_alive() -> int:

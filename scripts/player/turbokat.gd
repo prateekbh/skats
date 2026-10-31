@@ -9,7 +9,7 @@ signal special_fired(missiles: Array, def: Dictionary)
 
 const MIN_SPEED := 35.0
 const MAX_SPEED := 360.0
-const BOUNDARY := 2700.0
+const BOUNDARY_MARGIN := 350.0 # metres inside the world edge where the warning starts
 const CEILING := 1500.0
 const LOCK_RANGE := 1200.0
 const LOCK_CONE := 0.21 # radians, about 12 degrees
@@ -191,7 +191,8 @@ func _fly(dt: float) -> void:
 
 	var fwd := -b.z
 	# Keep the fight over Megakat City: steer back toward the centre past the boundary.
-	warn_boundary = Vector2(global_position.x, global_position.z).length() > BOUNDARY
+	var lim := city.world_half - Vector2(BOUNDARY_MARGIN, BOUNDARY_MARGIN)
+	warn_boundary = absf(global_position.x) > lim.x or absf(global_position.z) > lim.y
 	if warn_boundary:
 		var to_c := Vector3(-global_position.x, 0.0, -global_position.z).normalized()
 		var side := Vector3.UP.cross(fwd).dot(to_c)
@@ -413,6 +414,27 @@ func take_damage(amount: float) -> void:
 ## Brief invulnerability, used after scripted bumps against bosses.
 func grant_invulnerability(seconds: float) -> void:
 	_invuln = seconds
+
+
+## Takes a supply cache's contents and returns a one-line summary for the HUD.
+func collect_cache(c: Dictionary) -> String:
+	var parts: Array[String] = []
+	for k in c:
+		match str(k):
+			"hp":
+				hp = minf(max_hp, hp + float(c[k]))
+				parts.append("HULL +%d" % int(c[k]))
+			"boost":
+				boost = minf(100.0, boost + float(c[k]))
+			"blowtorch":
+				missiles = mini(max_missiles, missiles + int(c[k]))
+				parts.append("BLOWTORCH +%d" % int(c[k]))
+			_:
+				for def in Arsenal.SPECIALS:
+					if def.id == k:
+						special_ammo[k] = mini(special_ammo.get(k, 0) + int(c[k]), def.max)
+						parts.append("%s +%d" % [str(def.name).replace(" Missile", "").to_upper(), int(c[k])])
+	return "  ".join(parts)
 
 
 func collect(kind: String) -> void:

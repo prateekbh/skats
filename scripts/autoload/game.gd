@@ -3,6 +3,7 @@ extends Node
 ## saved best scores and the episode list.
 
 const SAVE_PATH := "user://megakat_skies.cfg"
+const SETTINGS_VERSION := 2
 
 const EPISODES: Array[Dictionary] = [
 	{
@@ -45,7 +46,7 @@ const EPISODES: Array[Dictionary] = [
 	},
 ]
 
-var invert_pitch := false
+var invert_pitch := true
 var muted := false
 ## Cinematic camera that follows special missiles.
 var missile_cam := true
@@ -103,6 +104,7 @@ func toggle_invert() -> void:
 
 func _save() -> void:
 	var cfg := ConfigFile.new()
+	cfg.set_value("settings", "version", SETTINGS_VERSION)
 	cfg.set_value("settings", "invert_pitch", invert_pitch)
 	cfg.set_value("settings", "muted", muted)
 	cfg.set_value("settings", "missile_cam", missile_cam)
@@ -115,7 +117,8 @@ func _load() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(SAVE_PATH) != OK:
 		return
-	invert_pitch = cfg.get_value("settings", "invert_pitch", false)
+	# Version 2 made inverted pitch the default: older saves get it switched on once.
+	invert_pitch = cfg.get_value("settings", "invert_pitch", true) if int(cfg.get_value("settings", "version", 1)) >= 2 else true
 	muted = cfg.get_value("settings", "muted", false)
 	missile_cam = cfg.get_value("settings", "missile_cam", true)
 	AudioServer.set_bus_mute(0, muted)

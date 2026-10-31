@@ -42,6 +42,13 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   Strips of more than three panels split into pages. `--comicshow=<dir>` saves every page of Episode 1.
 - Music (`scripts/autoload/music.gd` + `window.skMusic` in the shell) has two tracks that crossfade:
   the launcher theme and the episode story track.
+- The city is data: `data/city_plan.json` (km coordinates) -> `CityPlan` (raster + terrain) -> `CityBuildings`
+  (street grids, building types, collision grid, damage) + `CityLandmarks` -> `City`. To change the map, edit the
+  plan, then check it cheaply instead of with screenshots: `godot --headless --path . -- --citymap=<png> --citycheck`
+  (top-down map plus a report of areas, street gaps and airspace connectivity, ~3 s), `--flytest` (flies the
+  real TurboKat controller, no pull-up assist, down one street and one avenue per district; every lane must be
+  OK), and `--viewshot=<png> --cam=x,y,z --look=x,y,z` under xvfb for one frame from anywhere. Keep the
+  handoff's spacing (60-100 m ordinary, 100-160 m skyscraper gaps) and no dead-end air corridors.
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
   created per shot or per explosion. Effects go through the pooled `VFX` system
   (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.

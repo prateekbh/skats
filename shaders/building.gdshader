@@ -1,38 +1,62 @@
 shader_type spatial;
-// Megakat City towers. Windows are laid out in world space, so they stay the same size
-// whatever height a building is scaled to. INSTANCE_CUSTOM.r seeds which windows are lit.
-// Missile damage (City.damage_at): INSTANCE_CUSTOM.g is the impact height (0 = undamaged) and
-// .b / .a its offset from the centre in half-widths; around it the wall is scorched black with
-// a burnt-out hole and flickering embers. With `deform` the box itself is bent (see vertex()).
-// COLOR.a < 0.5 marks a broken roof: the top floors
-// are charred too, independently of the wall hit.
+// Megakat City facades. One shader draws every building part (MultiMesh instances of a unit box,
+// cylinder, gable prism or cone) and the hand-built landmarks.
+//
+// Per instance:  COLOR.rgb = wall colour, COLOR.a < 0.5 = broken roof (top floors charred)
+//                INSTANCE_CUSTOM.r = style + seed (style 0..11, +20 for a round part)
+//                .g/.b/.a = damage: impact height and its offset from the centre (City.damage_at)
+// Landmarks (single MeshInstance3D) set use_uniforms and the u_* values instead.
+//
+// Windows, brick courses and panels are laid out in the part's own metres, so they stay the same
+// size whatever a part is scaled to, follow its rotation, and don't swim when it is bent.
+
+uniform bool deform = false; // damaged-building MultiMeshes: bend the (subdivided) mesh
+uniform bool use_uniforms = false;
+uniform float u_style = 0.0;
+uniform vec4 u_color : source_color = vec4(0.7, 0.7, 0.7, 1.0);
+uniform float u_seed = 0.3;
+uniform float u_height = 40.0;
 
 varying vec3 world_pos;
-varying vec3 world_normal;
+varying vec3 lp; // position in the part's own metres, centred
+varying vec3 ln; // local normal
+varying float v_style;
 varying float seed;
+varying vec3 base_col;
+varying float part_h;
 varying vec3 impact;
 varying float damaged;
 varying float top;
 varying float roof_burnt;
 varying float dent;
-uniform bool deform = false; // set on the damaged-buildings MultiMesh only
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
 void vertex() {
-	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	world_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
-	seed = INSTANCE_CUSTOM.r;
-	dent = 0.0;
-	damaged = step(0.5, INSTANCE_CUSTOM.g);
 	vec3 scl = vec3(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[1].xyz), length(MODEL_MATRIX[2].xyz));
+	vec4 cus = INSTANCE_CUSTOM;
+	vec4 col = COLOR;
+	if (use_uniforms) {
+		scl = vec3(1.0);
+		cus = vec4(u_style + u_seed, 0.0, 0.0, 0.0);
+		col = u_color;
+	}
+	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	lp = VERTEX * scl;
+	ln = NORMAL;
+	v_style = floor(cus.x + 0.001);
+	seed = fract(cus.x + 0.001);
+	base_col = col.rgb;
+	part_h = use_uniforms ? u_height : scl.y;
+	dent = 0.0;
+	damaged = step(0.5, cus.y);
 	top = MODEL_MATRIX[3].y + scl.y * 0.5;
-	roof_burnt = 1.0 - step(0.5, COLOR.a);
+	roof_burnt = 1.0 - step(0.5, col.a);
 	vec3 centre = MODEL_MATRIX[3].xyz;
 	vec2 half_size = scl.xz * 0.5;
-	impact = vec3(centre.x + INSTANCE_CUSTOM.b * half_size.x, INSTANCE_CUSTOM.g, centre.z + INSTANCE_CUSTOM.a * half_size.y);
+	impact = vec3(centre.x + cus.z * half_size.x, cus.y, centre.z + cus.w * half_size.y);
 	if (deform) {
 		// Bend the (subdivided) box. Every offset is a function of position only, so vertices
 		// shared by two faces move together and the building stays closed. world_pos keeps the
@@ -41,7 +65,6 @@ void vertex() {
 		float k = clamp((world_pos.y - (centre.y - scl.y * 0.5)) / scl.y, 0.0, 1.0);
 		float n = hash(floor(world_pos.xz * 0.25 + 0.5) + floor(world_pos.y * 0.2 + 0.5) * 3.1 + seed * 17.0);
 		if (damaged > 0.5) {
-			// Crater punched in around the hit.
 			float r = 0.45 * min(scl.x, scl.z) + 8.0;
 			float f = clamp(1.0 - length(world_pos - impact) / r, 0.0, 1.0);
 			f = f * f * (3.0 - 2.0 * f);
@@ -50,11 +73,9 @@ void vertex() {
 			d.xz += inward * f * r * (0.35 + 0.3 * n);
 			d.y -= f * 4.0 * n;
 			dent = f;
-			// The whole tower leans away from the blow, more towards the top.
-			d.xz += inward * scl.y * 0.045 * k * k;
+			d.xz += inward * min(scl.y, 160.0) * 0.045 * k * k;
 		}
 		if (roof_burnt > 0.5) {
-			// Broken roofline: the top floors sag into a jagged edge.
 			float j = hash(floor(world_pos.xz * 0.2 + 0.5) + seed * 5.0);
 			d.y -= smoothstep(0.88, 1.0, k) * (4.0 + j * 14.0);
 		}
@@ -71,7 +92,7 @@ float scorch(vec3 p) {
 	}
 	if (damaged > 0.5) {
 		vec3 q = p - impact;
-		q.y *= 0.8; // scorch climbs the wall a little
+		q.y *= 0.8;
 		float d = length(q) + jag * 6.0;
 		s = max(s, step(d, 24.0) + step(d, 9.0));
 	}
@@ -79,37 +100,161 @@ float scorch(vec3 p) {
 }
 
 void fragment() {
-	vec3 wall = COLOR.rgb * 0.32;
+	int st = int(v_style);
+	bool round_s = st >= 20;
+	if (round_s) {
+		st -= 20;
+	}
+	// Coordinates on the wall: u along it, v up from the part's base (metres).
+	float u;
+	if (round_s) {
+		u = atan(lp.z, lp.x) * max(length(lp.xz), 0.5);
+	} else {
+		vec2 nh = ln.xz;
+		float nl = length(nh);
+		vec2 nd = nl > 0.001 ? nh / nl : vec2(1.0, 0.0);
+		u = lp.x * -nd.y + lp.z * nd.x;
+	}
+	float v = lp.y + part_h * 0.5;
+	bool top_face = ln.y > 0.7;
+	vec3 wall = base_col;
+	vec3 warm = vec3(1.0, 0.76, 0.42);
+	vec3 cool = vec3(0.55, 0.8, 1.0);
+	vec3 alb = wall;
+	vec3 emi = vec3(0.0);
+	float rough = 0.85;
+	float metal = 0.0;
 	float burnt = scorch(world_pos);
-	float flicker = 0.65 + 0.35 * sin(TIME * 9.0 + hash(floor(world_pos.xy * 0.5)) * 6.28);
+
+	if (st == 7) {
+		// Lot pad: paving with expansion joints, lawn for green pads.
+		vec2 g = fract(world_pos.xz / 9.0);
+		float joint = step(g.x, 0.025) + step(g.y, 0.025);
+		bool green = wall.g > wall.r * 1.15;
+		alb = top_face ? (green ? wall * (0.9 + 0.2 * hash(floor(world_pos.xz / 14.0))) : wall * (1.0 - 0.22 * min(joint, 1.0))) : wall * 0.5;
+	} else if (st == 8) {
+		alb = wall * 0.25;
+		emi = wall * 2.4;
+	} else if (st == 6) {
+		// Gable roof: courses of tiles.
+		float course = step(0.88, fract(v / 0.7));
+		alb = wall * (1.0 - 0.3 * course) * (0.92 + 0.16 * hash(vec2(floor(v / 0.7), floor(u / 0.9))));
+		rough = 0.9;
+	} else if (top_face) {
+		// Flat roofs: gravel and dark membrane, with the odd vent.
+		float patch = hash(floor(world_pos.xz / 6.0));
+		alb = wall * (0.22 + 0.1 * patch);
+		rough = 0.95;
+	} else if (st == 0) {
+		// Glass curtain wall: ribbons of glass between mullions, sunset reflections.
+		vec2 cell = vec2(u / 3.2, v / 3.9);
+		vec2 id = floor(cell);
+		vec2 f = fract(cell);
+		float win = step(0.07, f.x) * step(f.x, 0.93) * step(0.1, f.y) * step(f.y, 0.9);
+		float on = step(0.5, hash(id + seed * 113.0));
+		vec3 glass = mix(wall * 0.55, vec3(0.1, 0.2, 0.34), 0.5);
+		float refl = smoothstep(0.35, 1.0, sin(v * 0.035 + u * 0.012 + seed * 20.0));
+		glass += vec3(0.32, 0.16, 0.1) * refl * 0.7 + vec3(0.1, 0.18, 0.28) * smoothstep(0.0, 1.0, v / max(part_h, 1.0)) * 0.5;
+		alb = mix(wall * 0.35, glass, win);
+		emi = mix(warm, cool, step(0.7, hash(id * 1.7 + seed * 31.0))) * win * on * step(4.8, v) * 1.5;
+		metal = win * 0.5;
+		rough = mix(0.8, 0.12, win);
+	} else if (st == 1) {
+		// Art-deco stone: tall piers with narrow windows and cornice bands.
+		vec2 cell = vec2(u / 4.6, v / 4.2);
+		vec2 id = floor(cell);
+		vec2 f = fract(cell);
+		float win = step(0.3, f.x) * step(f.x, 0.7) * step(0.18, f.y) * step(f.y, 0.82) * step(4.8, v);
+		float on = step(0.52, hash(id + seed * 113.0));
+		float band = step(fract(v / 21.0), 0.035);
+		vec3 stone = wall * (1.0 - 0.18 * band - 0.1 * step(f.x, 0.08));
+		alb = mix(stone, vec3(0.05, 0.06, 0.09), win);
+		emi = warm * win * on * 1.7;
+		rough = mix(0.85, 0.2, win);
+	} else if (st == 2) {
+		// Brick: courses of bricks, punched windows with sills.
+		float row = floor(v / 0.26);
+		float brick = step(fract(v / 0.26), 0.12) + step(fract((u + mod(row, 2.0) * 0.28) / 0.56), 0.06);
+		vec2 cell = vec2(u / 3.4, v / 3.1);
+		vec2 id = floor(cell);
+		vec2 f = fract(cell);
+		float win = step(0.28, f.x) * step(f.x, 0.72) * step(0.22, f.y) * step(f.y, 0.78) * step(3.2, v);
+		float sill = step(0.18, f.y) * step(f.y, 0.22) * step(0.26, f.x) * step(f.x, 0.74) * step(3.2, v);
+		float on = step(0.55, hash(id + seed * 113.0));
+		vec3 b = wall * (1.0 - 0.28 * min(brick, 1.0)) * (0.9 + 0.2 * hash(vec2(row, floor(u / 0.56))));
+		alb = mix(b, vec3(0.05, 0.06, 0.09), win);
+		alb = mix(alb, vec3(0.7, 0.66, 0.6), sill);
+		emi = warm * win * on * 1.6;
+	} else if (st == 3) {
+		// Concrete slab: long ribbon windows.
+		vec2 cell = vec2(u / 4.0, v / 3.6);
+		vec2 id = floor(cell);
+		vec2 f = fract(cell);
+		float win = step(0.3, f.y) * step(f.y, 0.72) * step(0.04, f.x) * step(4.0, v);
+		float on = step(0.5, hash(id + seed * 113.0));
+		alb = mix(wall * (0.92 + 0.12 * hash(floor(vec2(u, v) / 3.0))), vec3(0.05, 0.07, 0.1), win);
+		emi = mix(warm, cool, step(0.8, hash(id * 1.7))) * win * on * 1.5;
+	} else if (st == 4) {
+		// Industrial: corrugated cladding, high strip windows, grime near the ground.
+		float rib = 0.86 + 0.14 * sin(u * 9.0);
+		float strip = step(part_h - 6.5, v) * step(v, part_h - 3.0);
+		float grime = 1.0 - 0.35 * (1.0 - smoothstep(0.0, 7.0, v));
+		alb = mix(wall * rib * grime, vec3(0.08, 0.1, 0.12), strip * step(0.15, fract(u / 6.0)));
+		emi = warm * strip * step(0.15, fract(u / 6.0)) * step(0.7, hash(vec2(floor(u / 6.0), seed * 40.0))) * 1.2;
+		rough = 0.7;
+		metal = 0.2;
+	} else if (st == 5) {
+		// House: pastel walls, small shuttered windows.
+		vec2 cell = vec2(u / 4.2, v / 3.3);
+		vec2 id = floor(cell);
+		vec2 f = fract(cell);
+		float win = step(0.3, f.x) * step(f.x, 0.7) * step(0.3, f.y) * step(f.y, 0.72) * step(0.5, hash(id + seed * 31.0));
+		float shutter = step(0.16, f.x) * step(f.x, 0.84) * step(0.28, f.y) * step(f.y, 0.74) * (1.0 - win);
+		alb = mix(wall, vec3(0.06, 0.07, 0.1), win);
+		alb = mix(alb, wall * 0.55, shutter * step(0.5, abs(f.x - 0.5) * 2.0 + 0.3));
+		emi = warm * win * step(0.55, hash(id + seed * 113.0)) * 1.4;
+	} else if (st == 9) {
+		// Civic limestone: tall window slots and heavy cornices.
+		vec2 cell = vec2(u / 5.4, v / 5.2);
+		vec2 id = floor(cell);
+		vec2 f = fract(cell);
+		float win = step(0.34, f.x) * step(f.x, 0.66) * step(0.12, f.y) * step(f.y, 0.82) * step(5.0, v);
+		float cornice = step(fract(v / 20.8), 0.05);
+		vec3 stone = wall * (1.0 - 0.2 * cornice) * (0.94 + 0.12 * hash(floor(vec2(u, v) / 2.5)));
+		alb = mix(stone, vec3(0.06, 0.07, 0.1), win);
+		emi = warm * win * step(0.4, hash(id + seed * 113.0)) * 1.8;
+		rough = mix(0.9, 0.2, win);
+	} else if (st == 10) {
+		// Painted metal: cranes, tanks, chimneys.
+		alb = wall * (0.82 + 0.18 * hash(vec2(floor(u * 1.5), floor(v * 0.4))));
+		metal = 0.35;
+		rough = 0.55;
+	} else if (st == 11) {
+		// Shipping container: ribbed sides, dark corner posts.
+		float ribs = 0.8 + 0.2 * sin(u * 15.0);
+		float post = step(fract(u / 12.2), 0.02) + step(0.98, fract(u / 12.2));
+		alb = wall * ribs * (1.0 - 0.5 * min(post, 1.0));
+		metal = 0.2;
+		rough = 0.6;
+	}
+
 	if (burnt > 1.5) {
 		// The hole: charred black with glowing embers in the cracks.
 		float ember = step(0.62, hash(floor(world_pos.xz * 0.9) + floor(world_pos.y * 0.9) * 7.0));
-		ALBEDO = vec3(0.02);
-		EMISSION = vec3(1.0, 0.38, 0.08) * ember * flicker * 2.2;
-		ROUGHNESS = 1.0;
-	} else if (world_normal.y > 0.5) {
-		ALBEDO = burnt > 0.5 ? vec3(0.03) : vec3(0.08, 0.085, 0.11);
-		ROUGHNESS = 0.95;
-	} else {
-		float u = abs(world_normal.x) > 0.5 ? world_pos.z : world_pos.x;
-		vec2 cell = vec2(u / 4.2, world_pos.y / 4.8);
-		vec2 id = floor(cell);
-		vec2 f = fract(cell);
-		float win = step(0.2, f.x) * step(f.x, 0.8) * step(0.22, f.y) * step(f.y, 0.78);
-		win *= step(4.8, world_pos.y);
-		float on = step(0.52, hash(id + seed * 113.0));
-		vec3 warm = vec3(1.0, 0.76, 0.42);
-		vec3 cool = vec3(0.55, 0.8, 1.0);
-		vec3 lit = mix(warm, cool, step(0.78, hash(id * 1.7 + seed * 31.0)));
-		if (burnt > 0.5) {
-			// Scorched: soot-black wall, windows blown out, a few still glowing with fire.
-			wall = vec3(0.035, 0.03, 0.03);
-			lit = vec3(1.0, 0.45, 0.12) * flicker;
-			on *= step(0.75, hash(id * 2.3 + seed));
-		}
-		ALBEDO = mix(wall, vec3(0.04, 0.05, 0.08), win) * (1.0 - dent * 0.6); // shadowed crater
-		EMISSION = lit * win * on * 1.7;
-		ROUGHNESS = mix(0.85, 0.15, win);
+		float flicker = 0.65 + 0.35 * sin(TIME * 9.0 + hash(floor(world_pos.xy * 0.5)) * 6.28);
+		alb = vec3(0.02);
+		emi = vec3(1.0, 0.38, 0.08) * ember * flicker * 2.2;
+		rough = 1.0;
+		metal = 0.0;
+	} else if (burnt > 0.5) {
+		// Scorched: soot-black walls, blown-out windows, a few still glowing.
+		float flicker = 0.65 + 0.35 * sin(TIME * 9.0 + hash(floor(world_pos.xy * 0.5)) * 6.28);
+		alb = mix(alb * 0.18, vec3(0.03), 0.4);
+		emi = emi * step(0.75, hash(floor(vec2(u, v) / 3.0) + seed)) * vec3(1.0, 0.45, 0.12) * flicker;
+		metal = 0.0;
 	}
+	ALBEDO = alb * (1.0 - dent * 0.6);
+	EMISSION = emi;
+	ROUGHNESS = rough;
+	METALLIC = metal;
 }

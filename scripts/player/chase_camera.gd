@@ -17,7 +17,7 @@ var _shake := 0.0
 
 func _ready() -> void:
 	near = 0.5
-	far = 12000.0
+	far = 22000.0
 	fov = 68.0
 
 

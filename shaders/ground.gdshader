@@ -1,12 +1,21 @@
 shader_type spatial;
-// Street grid drawn procedurally in world space: asphalt roads, lane dashes, sidewalks,
-// and scrubland outside the city limits.
-
-uniform float cell_size = 90.0;
-uniform float city_half = 1260.0;
-uniform float road_half_width = 13.0;
+render_mode cull_disabled;
+// Terrain for the whole of Megakat's world. City.gd bakes each vertex colour from the plan
+// (grass, parks, sand, rock, snow); COLOR.a marks built-up ground, drawn as dark asphalt so the
+// streets read between the paved lots of the buildings.
 
 varying vec3 world_pos;
+
+float hash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float vnoise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -14,18 +23,9 @@ void vertex() {
 
 void fragment() {
 	vec2 p = world_pos.xz;
-	float in_city = step(abs(p.x), city_half) * step(abs(p.y), city_half);
-	vec2 g = mod(p + city_half, cell_size);
-	vec2 d = min(g, cell_size - g);
-	float near = min(d.x, d.y);
-	float road = step(near, road_half_width);
-	float along = d.x < d.y ? p.y : p.x;
-	float dash = step(near, 0.45) * step(0.5, fract(along / 14.0));
-	vec3 scrub = vec3(0.17, 0.19, 0.13) + 0.03 * sin(p.x * 0.01) * sin(p.y * 0.013);
-	vec3 asphalt = vec3(0.1, 0.1, 0.12);
-	vec3 sidewalk = vec3(0.21, 0.2, 0.22);
-	vec3 col = mix(sidewalk, asphalt, road);
-	col = mix(col, vec3(0.95, 0.75, 0.2), dash);
-	ALBEDO = mix(scrub, col, in_city);
+	float n = vnoise(p * 0.02) * 0.6 + vnoise(p * 0.11) * 0.3 + vnoise(p * 0.7) * 0.1;
+	vec3 natural = COLOR.rgb * (0.82 + 0.34 * n);
+	vec3 asphalt = vec3(0.14, 0.14, 0.16) + 0.04 * vnoise(p * 0.35);
+	ALBEDO = mix(natural, asphalt, COLOR.a);
 	ROUGHNESS = 0.95;
 }

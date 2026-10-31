@@ -6,7 +6,7 @@ const GREEN_DIM := Color(0.62, 1.0, 0.72, 0.35)
 const RED := Color(1.0, 0.27, 0.3)
 const AMBER := Color(1.0, 0.78, 0.25)
 const GREY := Color(0.7, 0.72, 0.78, 0.7)
-const RADAR_RANGE := 1600.0
+const RADAR_RANGE := 2400.0
 
 var main: Node
 var font: Font
@@ -377,10 +377,20 @@ func _draw_radar(p: TurboKat, c: Vector2, r: float) -> void:
 	var hs := Vector2(hd.dot(right2), -hd.dot(f2)) * scale
 	if hs.length() < r:
 		draw_rect(Rect2(c + hs - Vector2(3, 3), Vector2(6, 6)), Color(0.5, 0.7, 1.0, 0.8))
+	for cache in main.combat.caches():
+		if not is_instance_valid(cache) or not cache.available:
+			continue
+		var cd := Vector2(cache.global_position.x - p.global_position.x, cache.global_position.z - p.global_position.z)
+		var cs := Vector2(cd.dot(right2), -cd.dot(f2)) * scale
+		if cs.length() < r - 4:
+			draw_rect(Rect2(c + cs - Vector2(3, 3), Vector2(6, 6)), SupplyCache.color_for(cache.kind))
+			draw_rect(Rect2(c + cs - Vector2(3, 3), Vector2(6, 6)), Color.BLACK, false, 1.0)
 	for t: Target in main.combat.targets:
 		if not is_instance_valid(t) or not t.alive or not t.is_visible_in_tree():
 			continue
 		var d := Vector2(t.global_position.x - p.global_position.x, t.global_position.z - p.global_position.z)
+		if t is GroundFlak and d.length() > 900.0:
+			continue # flak nests only show up when you are close enough to matter
 		var s := Vector2(d.dot(right2), -d.dot(f2)) * scale
 		if s.length() > r - 3:
 			s = s.normalized() * (r - 3)

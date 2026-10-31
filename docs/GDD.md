@@ -142,14 +142,44 @@ The opening can be skipped with Esc. The hatch launch follows it and hands over 
 
 ## 7. World
 
-Procedural **Megakat City** (28×28 blocks, about 2.5 km across):
-- A world-space window shader keeps window size constant on any building height; lit windows are randomized per building.
-- A downtown height falloff, so the skyline peaks at City Hall and Enforcer HQ.
-- The bay to the east and mountains on the horizon, under a dusk sky with fog and glow.
-- The salvage yard to the west (the hidden hangar) is where every sortie launches.
-- Buildings collapse when bosses walk through them (the API exists; Viper's and Pastmaster's bosses will use it).
+**Megakat City** is a 15 x 10 km world (about 150 km2, from the environment handoff) generated from a
+small data file, `data/city_plan.json`: water, districts, landmarks, mountain ridges, piers, bridges and
+supply caches in a few dozen lines (coordinates in km, sizes in metres). Edit the plan, then look at it
+with `--citymap` and measure it with `--citycheck` (see CLAUDE.md); nothing else needs touching.
 
-Collisions use custom math (height field plus spheres and capsules) instead of physics bodies:
+| District | What it is | Street gaps |
+|---|---|---|
+| Downtown core | Tower clusters with a skyline hierarchy; MegaKat Tower (~1,200 m, 300 storeys) and City Hall (~250 m, working clock) | 100-160 m, avenues 170-220 m |
+| Commercial high-rise | Glass towers, podium towers, twin towers with sky-bridges, round towers | 100-160 m |
+| Civic + Enforcer | Stone civic blocks around Enforcer HQ (~300 m, shield emblem) | 80-130 m |
+| Residential + suburb | Mid-rise brick and low-rise houses with gardens, tree-lined | 60-110 m |
+| Industrial waterfront + docks | Warehouses, factories, container yards, piers with gantry cranes and ships | 60-100 m |
+| Salvage yard | Jake & Chance's Garage (two-storey) in a scrapyard; the hangar hatch is below | 70-110 m |
+| Park | A large open meadow with a lake and tree groves: a combat arena | none |
+| Outer wilds | Mountain ridges, a river with a dam, wetlands, beaches, islands, a lighthouse, the open sea | none |
+
+- **Spacing** follows the handoff: 60-100 m between ordinary buildings, 100-160 m between skyscrapers,
+  open plazas (200-400 m) left in the grid, 150-300 m waterfront corridors. Buildings stay inset from
+  district borders so two districts never pinch a street. Three bridges cross the river (their decks are
+  not solid, so the river stays a flight corridor) and there are no landing mechanics.
+- **Looks:** twelve facade styles (glass curtain wall, art-deco stone, brick, concrete, industrial,
+  house, civic limestone, painted metal, containers, neon signs...) and about a dozen building types
+  built from boxes, cylinders, gable roofs and cones, with district palettes, rooftop props and street
+  lamps. One shader draws all of it; windows are laid out in each part's own metres.
+- **Terrain:** a real height-mapped terrain (sea floor, shores, beaches, ridges up to 700 m, wetlands)
+  with a water plane at 0. Land fades to sea past the playable edge.
+- **Collision:** a 20 m height grid, so podiums, setbacks and mountains all count, plus a grid saying which
+  building owns each cell. `height_at()` is a lookup; there are no physics bodies.
+- **Damage:** a missile hit knocks a roof down with rubble, snaps and tilts a narrower crown, or blasts a
+  burning, bent hole in a wall; the building moves into a MultiMesh of subdivided boxes that the shader
+  bends. Thick smoke columns rise and the damage lasts until the next stage.
+- **Supply caches:** about fifty light-beam caches on streets, plazas, piers and in the park hold special
+  missiles (two types, +2 each), a Blowtorch pack or repair; collect one by flying within 26 m and under
+  40 m above it. About a third are guarded by flak nests. They refill after 60 s and show on the radar.
+- Landmark geometry is generated from the handoff's proposed proportions; check the silhouettes against
+  series frames before polishing (only the 300-storey MegaKat Tower is a canon anchor).
+
+Collisions use custom math (height grid plus spheres and capsules) instead of physics bodies:
 cheap on the web and deterministic.
 
 ## 8. Presentation

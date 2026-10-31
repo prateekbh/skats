@@ -32,6 +32,9 @@ var _missile_pools := {}
 ## Octopus Missile tentacle rigs: reusable, and the ones currently holding a captive.
 var _tentacle_pool: Array[Node3D] = []
 var _captures: Array[Dictionary] = []
+## Ground supply caches (see SupplyCache), and which are available.
+var _caches: Array[SupplyCache] = []
+
 ## Cut-apart debris (Slicer / Buzz-Saw kills): reusable piece rigs and the ones in flight.
 var _piece_pool: Array[Dictionary] = []
 var _pieces: Array[Dictionary] = []
@@ -138,7 +141,41 @@ func _on_target_died(t: Target) -> void:
 	target_killed.emit(t)
 
 
+## Creates the supply caches (and their flak nests) at the city's cache spots.
+func setup_caches(spots: Array) -> void:
+	_free_caches()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 91
+	for sp: Dictionary in spots:
+		var roll := rng.randf()
+		var k := "special" if roll < 0.45 else ("blowtorch" if roll < 0.75 else "repair")
+		var cache := SupplyCache.new()
+		add_child(cache)
+		cache.global_position = sp.pos
+		cache.setup(self, k, rng)
+		_caches.append(cache)
+		if sp.guarded:
+			for n in 2:
+				var a := rng.randf() * TAU
+				var nest := GroundFlak.new()
+				add_target(nest)
+				nest.global_position = sp.pos + Vector3(cos(a), 0.0, sin(a)) * rng.randf_range(34.0, 55.0)
+				nest.setup(self)
+
+
+func caches() -> Array[SupplyCache]:
+	return _caches
+
+
+func _free_caches() -> void:
+	for c in _caches:
+		if is_instance_valid(c):
+			c.queue_free()
+	_caches.clear()
+
+
 func clear() -> void:
+	_free_caches()
 	for t in targets:
 		if is_instance_valid(t) and t.get_parent() == self:
 			t.queue_free()

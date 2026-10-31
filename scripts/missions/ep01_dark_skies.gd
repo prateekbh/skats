@@ -15,6 +15,7 @@ enum Phase { WAVE_1, WAVE_2, BOSS, OUTRO }
 var phase := Phase.WAVE_1
 var boss: DarkKatWarship
 var _advancing := false
+var _spotted := false
 
 
 ## Every comic strip of the episode, by name (also used by `--comicshow`).
@@ -78,19 +79,19 @@ func intro() -> Array:
 func start() -> void:
 	var hq: Vector3 = main.city.enforcer_hq_pos
 	spawn_wave(hq + Vector3(0, 280, 0), 6)
-	radio("Razor", "Weapons hot. Keep 'em in the reticle for a lock, then send a missile.", 4.0)
-	# The Creeplings aren't really attacking HQ: they're pulling the Enforcer jets off it.
-	after(16.0, func():
-		radio("Razor", "Wait. They're not hitting HQ, they're dragging the Enforcer jets away from it. Why?", 4.5)
-		radio("T-Bone", "Ask 'em after we pop a few.", 3.0, "grin"))
+	radio("Razor", "Enforcer HQ is %.0f klicks out across the city. Light the afterburner, Shift, and keep it low over the rooftops." % (main.player.global_position.distance_to(hq) / 1000.0), 5.5)
+	radio("Razor", "Weapons hot. Keep 'em in the reticle for a lock, then send a missile. And if you're dry, dive for the supply beacons.", 5.0)
+	# The trip across the city is long: a little company on the radio.
+	after(9.0, func(): radio("T-Bone", "Never gets old, that skyline. The MegaKat Tower, all 300 floors of it.", 4.5, "grin"))
+	after(20.0, func(): radio("Callie Briggs", "Enforcer HQ is taking a beating! How far out are you, guys?", 4.5, "alarmed"))
 
 
 func objective() -> String:
 	match phase:
 		Phase.WAVE_1:
-			return "PART 1/3: DESTROY THE CREEPLINGS (%d LEFT)" % enemies_alive()
+			return "PART 1/3: DESTROY THE CREEPLINGS (%d LEFT)%s" % [enemies_alive(), far_note()]
 		Phase.WAVE_2:
-			return "PART 2/3: DEFEND CITY HALL (%d LEFT)" % enemies_alive()
+			return "PART 2/3: DEFEND CITY HALL (%d LEFT)%s" % [enemies_alive(), far_note()]
 		Phase.BOSS:
 			if boss and boss.phase == 0:
 				var n := 0
@@ -103,6 +104,12 @@ func objective() -> String:
 
 
 func update(_dt: float) -> void:
+	if phase == Phase.WAVE_1 and not _spotted and far_note() == "" and enemies_alive() > 0:
+		# Close enough to see it: the Creeplings aren't really attacking HQ, they're pulling the
+		# Enforcer jets off it.
+		_spotted = true
+		radio("Razor", "Wait. They're not hitting HQ, they're dragging the Enforcer jets away from it. Why?", 4.5)
+		radio("T-Bone", "Ask 'em after we pop a few.", 3.0, "grin")
 	if _advancing:
 		return
 	match phase:
@@ -131,7 +138,9 @@ func _start_wave_2() -> void:
 
 func _start_boss() -> void:
 	phase = Phase.BOSS
-	boss = main.spawn_boss(DarkKatWarship.new())
+	var ship := DarkKatWarship.new()
+	ship.center = main.city.enforcer_hq_pos # the Fear Ship II circles Enforcer HQ
+	boss = main.spawn_boss(ship)
 	boss.spawn_glider = func(pos: Vector3): main.spawn_creepling(pos, false, pos)
 	boss.phase_changed.connect(_on_boss_phase)
 	boss.destroyed.connect(_on_boss_destroyed)
