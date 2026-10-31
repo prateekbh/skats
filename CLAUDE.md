@@ -50,6 +50,10 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   OK), and `--viewshot=<png> --cam=x,y,z --look=x,y,z` under xvfb for one frame from anywhere. Keep the
   streets tight but flyable (gaps 32-85 m, avenues 100-140 m) and no dead-end air corridors; the user wants a dense,
   tall, Manhattan-like city that is not too easy.
+- Building shapes: `CityBuildings` archetypes assemble parts of seven meshes (box, cylinder, gable prism, cone, octagon,
+  tapered block `FRUST`, pyramid `PYR`) with non-colliding trim (plinths, cornices via `S.TRIM`), crowns (`_crown`),
+  towers with setbacks/taper/offset stacks (`_tower`), water tanks, fire escapes (`S.ESCAPE`, see-through shader style) and
+  house garages/porches. The facade shader adds recessed windows, sills, quoins and steel corner fins. Mesh kinds must stay < 8.
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
   created per shot or per explosion. Effects go through the pooled `VFX` system
   (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.

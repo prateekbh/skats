@@ -15,8 +15,8 @@ extends RefCounted
 
 const BuildingShader := preload("res://shaders/building.gdshader")
 
-enum M { BOX, CYL, PRISM, CONE }
-enum S { GLASS, DECO, BRICK, CONCRETE, INDUSTRIAL, HOUSE, ROOF, LOT, NEON, CIVIC, METAL, CONTAINER }
+enum M { BOX, CYL, PRISM, CONE, OCT, FRUST, PYR }
+enum S { GLASS, DECO, BRICK, CONCRETE, INDUSTRIAL, HOUSE, ROOF, LOT, NEON, CIVIC, METAL, CONTAINER, TRIM, ESCAPE }
 const ROUND := 20 # added to a style for a round (cylindrical) part
 const TILE := 2500.0
 const GRID := 20.0
@@ -329,7 +329,7 @@ func part(id: int, mk: int, cx: float, y0: float, cz: float, w: float, h: float,
 	var tz := clampi(int(floor((cz + plan.half.y) / TILE)), 0, int(ceil(plan.half.y * 2.0 / TILE)) - 1)
 	p_tile.append(tz * 16 + tx)
 	p_inst.append(-1)
-	p_rast.append(1 if (rast and mk != M.CONE) else 0)
+	p_rast.append(1 if (rast and mk != M.CONE and mk != M.PYR) else 0)
 	p_yaw.append(yaw)
 	return pi
 
@@ -347,7 +347,7 @@ func _raster_part(pi: int, own: int) -> void:
 	var xf := p_xf[pi]
 	var sc := xf.basis.get_scale()
 	var top := xf.origin.y + sc.y * 0.5
-	raster_box(xf.origin.x, xf.origin.z, sc.x, sc.z, top, p_yaw[pi], own, p_kind[pi] == M.CYL)
+	raster_box(xf.origin.x, xf.origin.z, sc.x, sc.z, top, p_yaw[pi], own, p_kind[pi] == M.CYL or p_kind[pi] == M.OCT)
 
 
 ## Writes a footprint (oriented rectangle or circle) into the collision grid.
@@ -418,26 +418,141 @@ func _roof_extras(id: int, cx: float, cz: float, w: float, d: float, topy: float
 			part(id, M.BOX, cx + w * 0.5 + 0.6, G + minf(h * 0.6, 60.0), cz, 1.2, minf(h * 0.3, 30.0), 5.0, S.NEON, nc, false, 0.0, false)
 
 
+## Stone trim that doesn't collide: plinths, cornices, steps.
+func _trim(id: int, cx: float, cz: float, w: float, d: float, y0: float, h: float, col: Color) -> void:
+	part(id, M.BOX, cx, y0, cz, w, h, d, S.TRIM, col, false, 0.0, false)
+
+
+func _plinth(id: int, cx: float, cz: float, w: float, d: float, col: Color) -> void:
+	_trim(id, cx, cz, w + 2.0, d + 2.0, G, 4.5, col.darkened(0.25))
+
+
+## A projecting stone cap on a wall that ends at topy; the roof above it is raised by 1.6 m.
+func _cornice(id: int, cx: float, cz: float, w: float, d: float, topy: float, col: Color) -> void:
+	_trim(id, cx, cz, w + 2.4, d + 2.4, topy - 0.3, 1.9, col)
+
+
+func _mast(id: int, cx: float, cz: float, y0: float, h: float, beacon: bool) -> void:
+	part(id, M.BOX, cx, y0, cz, 1.3, h, 1.3, S.METAL, Color(0.6, 0.6, 0.65), false, 0.0, false)
+	if beacon:
+		part(id, M.BOX, cx, y0 + h, cz, 2.4, 2.4, 2.4, S.NEON, Color(1.0, 0.15, 0.1), false, 0.0, false)
+
+
+## A wooden water tank on a steel stand, the New York rooftop signature.
+func _water_tank(id: int, x: float, z: float, topy: float) -> void:
+	var wood := Color(0.42, 0.3, 0.2)
+	for sx in [-1.6, 1.6]:
+		for sz in [-1.6, 1.6]:
+			part(id, M.BOX, x + sx, topy, z + sz, 0.5, 3.2, 0.5, S.METAL, Color(0.2, 0.2, 0.22), false, 0.0, false)
+	part(id, M.CYL, x, topy + 3.2, z, 4.6, 4.4, 4.6, S.METAL, wood, false, 0.0, false)
+	part(id, M.CONE, x, topy + 7.6, z, 4.9, 1.8, 4.9, S.METAL, wood.darkened(0.35), false, 0.0, false)
+
+
+## The top of a tower: flat with a cornice, stepped, a slanted cap or a pyramid spire. Returns the roof height.
+func _crown(id: int, cx: float, cz: float, tw: float, td: float, topy: float, h: float, col: Color, kid: int, style: int) -> void:
+	var m := minf(tw, td)
+	match rng.randi() % (4 if h > 130.0 else 2):
+		0:
+			_cornice(id, cx, cz, tw, td, topy, col.darkened(0.3))
+			_roof_extras(id, cx, cz, tw, td, topy + 1.6, h, kid)
+		1:
+			part(id, M.BOX, cx, topy, cz, tw * 0.64, 9.0, td * 0.64, style, col.darkened(0.12), false, 0.0, false)
+			part(id, M.BOX, cx, topy + 9.0, cz, tw * 0.36, 7.0, td * 0.36, style, col.darkened(0.2), false, 0.0, false)
+			_mast(id, cx, cz, topy + 16.0, clampf(h * 0.12, 10.0, 55.0), h > 150.0)
+		2:
+			var ch := clampf(m * 0.3, 7.0, 20.0)
+			part(id, M.FRUST, cx, topy, cz, tw, ch, td, style, col.darkened(0.18), false, 0.0, false)
+			part(id, M.BOX, cx, topy + ch, cz, tw * 0.72, 3.0, td * 0.72, S.TRIM, col.darkened(0.3), false, 0.0, false)
+			_mast(id, cx, cz, topy + ch + 3.0, clampf(h * 0.1, 8.0, 45.0), h > 150.0)
+		_:
+			var ph := clampf(m * 0.85, 14.0, 52.0)
+			_cornice(id, cx, cz, tw, td, topy, col.darkened(0.3))
+			part(id, M.PYR, cx, topy + 1.6, cz, tw * 0.9, ph, td * 0.9, S.ROOF, Color(0.28, 0.5, 0.42) if rng.randf() < 0.5 else Color(0.22, 0.24, 0.3), false, 0.0, false)
+			_mast(id, cx, cz, topy + 1.6 + ph, clampf(ph * 0.4, 6.0, 20.0), h > 150.0)
+
+
+## One tower: plain, with setbacks, tapered (a frustum), a stack of offset blocks or octagonal.
+## Returns the part that snaps and leans when hit near its base (or -1).
+func _tower(id: int, cx: float, cz: float, w: float, d: float, y0: float, h: float, col: Color, kid: int, mode: int, style := S.GLASS) -> int:
+	var tier := -1
+	var topy := y0 + h
+	var tw := w
+	var td := d
+	match mode:
+		1:
+			var h1 := h * 0.62
+			var h2 := h * 0.26
+			part(id, M.BOX, cx, y0, cz, w, h1, d, style, col)
+			_cornice(id, cx, cz, w, d, y0 + h1, col.darkened(0.3))
+			part(id, M.BOX, cx, y0 + h1, cz, w * 0.74, h2, d * 0.74, style, col.lightened(0.04))
+			_cornice(id, cx, cz, w * 0.74, d * 0.74, y0 + h1 + h2, col.darkened(0.3))
+			tw = w * 0.5
+			td = d * 0.5
+			tier = part(id, M.BOX, cx, y0 + h1 + h2, cz, tw, h * 0.12, td, style, col.darkened(0.1))
+		2:
+			var h1 := h * 0.7
+			var h2 := h * 0.3
+			part(id, M.BOX, cx, y0, cz, w, h1, d, style, col)
+			tier = part(id, M.FRUST, cx, y0 + h1, cz, w, h2, d, style, col.lightened(0.03))
+			tw = w * 0.72
+			td = d * 0.72
+		3:
+			part(id, M.BOX, cx - w * 0.15, y0, cz, w * 0.7, h * 0.58, d, style, col)
+			part(id, M.BOX, cx + w * 0.15, y0, cz + d * 0.05, w * 0.7, h * 0.82, d * 0.8, style, col.lightened(0.05))
+			part(id, M.BOX, cx, y0, cz - d * 0.05, w * 0.5, h, d * 0.55, style, col.darkened(0.06))
+			tw = w * 0.5
+			td = d * 0.55
+		4:
+			var ow := minf(w, d) * 0.92
+			part(id, M.OCT, cx, y0, cz, ow, h * 0.86, ow, style, col)
+			tier = part(id, M.OCT, cx, y0 + h * 0.86, cz, ow * 0.7, h * 0.14, ow * 0.7, style, col.darkened(0.08))
+			tw = ow * 0.7
+			td = tw
+		_:
+			part(id, M.BOX, cx, y0, cz, w, h, d, style, col)
+	_crown(id, cx, cz, tw, td, topy, h, col, kid, style)
+	return tier
+
+
 func _glass(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
 	var col: Color = _c(GLASS_COLS)
-	part(id, M.BOX, cx, G, cz, w, h, d, S.GLASS, col)
-	var topy := G + h
-	if h > 110.0:
-		part(id, M.BOX, cx, topy, cz, w * 0.6, h * 0.06, d * 0.6, S.GLASS, col.darkened(0.25))
-		topy += h * 0.06
-	_roof_extras(id, cx, cz, w, d, topy, h, kid)
+	_plinth(id, cx, cz, w, d, _c(STONE_COLS))
+	var mode := 0
+	if h > 90.0:
+		mode = [0, 1, 2, 2, 3, 4][rng.randi() % 6] as int
+	else:
+		mode = rng.randi() % 2
+	var tier := _tower(id, cx, cz, w, d, G, h, col, kid, mode)
 	end(id)
+	b_tier[id] = tier
 
 
 func _deco(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
 	var col: Color = _c(STONE_COLS)
-	part(id, M.BOX, cx, G, cz, w, h * 0.5, d, S.DECO, col)
-	part(id, M.BOX, cx, G + h * 0.5, cz, w * 0.78, h * 0.3, d * 0.78, S.DECO, col)
-	var tier := part(id, M.BOX, cx, G + h * 0.8, cz, w * 0.52, h * 0.2, d * 0.52, S.DECO, col.lightened(0.05))
-	part(id, M.CONE, cx, G + h, cz, w * 0.14, h * 0.14, d * 0.14, S.METAL, Color(0.85, 0.65, 0.25), false, 0.0, false)
-	_roof_extras(id, cx, cz, w * 0.5, d * 0.5, G + h, h, kid)
+	_plinth(id, cx, cz, w, d, col)
+	var taper := rng.randf() < 0.4
+	var y := G
+	var sw := [1.0, 0.8, 0.6, 0.42]
+	var sh := [0.46, 0.28, 0.18, 0.08]
+	var tier := -1
+	for k in 4:
+		var bw: float = w * sw[k]
+		var bd: float = d * sw[k]
+		var bh: float = h * sh[k]
+		if k == 2 and taper:
+			part(id, M.FRUST, cx, y, cz, bw, bh, bd, S.DECO, col)
+		elif k == 3:
+			tier = part(id, M.BOX, cx, y, cz, bw, bh, bd, S.DECO, col.lightened(0.05))
+		else:
+			part(id, M.BOX, cx, y, cz, bw, bh, bd, S.DECO, col)
+		y += bh
+		if k < 3:
+			_cornice(id, cx, cz, bw if not (k == 2 and taper) else bw * 0.72, bd if not (k == 2 and taper) else bd * 0.72, y, col.darkened(0.12))
+	var top_w := w * 0.42
+	part(id, M.PYR, cx, y + 1.6, cz, top_w, h * 0.14, d * 0.42, S.ROOF, Color(0.85, 0.65, 0.25) if rng.randf() < 0.6 else Color(0.3, 0.5, 0.42), false, 0.0, false)
+	_mast(id, cx, cz, y + 1.6 + h * 0.14, clampf(h * 0.06, 6.0, 26.0), h > 150.0)
 	end(id)
 	b_tier[id] = tier
 
@@ -446,14 +561,17 @@ func _podium(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> vo
 	var id := begin(cx, cz, kid)
 	var hp := rng.randf_range(22.0, 44.0)
 	var stone: Color = _c(STONE_COLS)
+	_plinth(id, cx, cz, w, d, stone)
 	part(id, M.BOX, cx, G, cz, w, hp, d, S.CONCRETE if rng.randf() < 0.5 else S.DECO, stone)
+	_cornice(id, cx, cz, w, d, G + hp, stone.darkened(0.15))
 	var tw := w * rng.randf_range(0.5, 0.62)
 	var td := d * rng.randf_range(0.5, 0.62)
 	var tx := cx + rng.randf_range(-0.15, 0.15) * w
 	var tz := cz + rng.randf_range(-0.15, 0.15) * d
 	var col: Color = _c(GLASS_COLS)
-	var tier := part(id, M.BOX, tx, G + hp, tz, tw, maxf(h - hp, 30.0), td, S.GLASS, col)
-	_roof_extras(id, tx, tz, tw, td, G + maxf(h, hp + 30.0), h, kid)
+	var tier := _tower(id, tx, tz, tw, td, G + hp + 1.6, maxf(h - hp, 30.0), col, kid, [0, 1, 2, 4][rng.randi() % 4])
+	# A rooftop terrace on the podium.
+	part(id, M.BOX, cx - w * 0.3, G + hp + 1.6, cz + d * 0.3, w * 0.22, 1.2, d * 0.18, S.LOT, Color(0.27, 0.45, 0.2), false, 0.0, false)
 	end(id)
 	b_tier[id] = tier
 
@@ -462,10 +580,11 @@ func _twin(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void
 	var id := begin(cx, cz, kid)
 	var col: Color = _c(GLASS_COLS)
 	var tw := w * 0.36
-	part(id, M.BOX, cx - w * 0.3, G, cz, tw, h, d * 0.7, S.GLASS, col)
-	part(id, M.BOX, cx + w * 0.3, G, cz, tw, h * 0.9, d * 0.7, S.GLASS, col.lightened(0.05))
+	_plinth(id, cx, cz, w, d * 0.7, _c(STONE_COLS))
+	var m1: int = [0, 2, 1][rng.randi() % 3]
+	_tower(id, cx - w * 0.3, cz, tw, d * 0.7, G, h, col, kid, m1)
+	_tower(id, cx + w * 0.3, cz, tw, d * 0.7, G, h * 0.9, col.lightened(0.05), kid, [0, 2][rng.randi() % 2])
 	part(id, M.BOX, cx, G + h * 0.62, cz, w * 0.3, 7.0, d * 0.35, S.GLASS, col.darkened(0.2))
-	_roof_extras(id, cx - w * 0.3, cz, tw, d * 0.7, G + h, h, kid)
 	end(id)
 
 
@@ -473,25 +592,56 @@ func _round(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> voi
 	var id := begin(cx, cz, kid)
 	var r := minf(w, d) * 0.42
 	var col: Color = _c(GLASS_COLS)
-	part(id, M.CYL, cx, G, cz, r * 2.0, h, r * 2.0, S.GLASS, col, true)
-	part(id, M.CYL, cx, G + h, cz, r * 1.7, 6.0, r * 1.7, S.METAL, col.lightened(0.15), false)
-	_roof_extras(id, cx, cz, r, r, G + h + 6.0, h, kid)
+	var stone: Color = _c(STONE_COLS)
+	if rng.randf() < 0.4:
+		part(id, M.OCT, cx, G, cz, r * 2.0, h, r * 2.0, S.GLASS, col)
+		part(id, M.OCT, cx, G + h, cz, r * 1.6, 5.0, r * 1.6, S.TRIM, stone.darkened(0.3), false, 0.0, false)
+	else:
+		part(id, M.CYL, cx, G, cz, r * 2.0, h, r * 2.0, S.GLASS, col, true)
+		part(id, M.CYL, cx, G + h, cz, r * 1.72, 5.0, r * 1.72, S.TRIM, stone.darkened(0.3), false, 0.0, false)
+	part(id, M.CYL, cx, G, cz, r * 2.0 + 3.0, 4.5, r * 2.0 + 3.0, S.TRIM, stone.darkened(0.25), false, 0.0, false)
+	part(id, M.CYL, cx, G + h + 5.0, cz, r * 1.0, 10.0, r * 1.0, S.METAL, col.lightened(0.15), false, 0.0, false)
+	_roof_extras(id, cx, cz, r, r, G + h + 5.0, h, kid)
+	_mast(id, cx, cz, G + h + 15.0, clampf(h * 0.1, 8.0, 40.0), h > 150.0)
 	end(id)
 
 
 func _slab(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	part(id, M.BOX, cx, G, cz, w, h, d, S.CONCRETE, _c(CONCRETE_COLS))
-	_roof_extras(id, cx, cz, w, d, G + h, h, kid)
+	var col: Color = _c(CONCRETE_COLS)
+	_plinth(id, cx, cz, w, d, col)
+	part(id, M.BOX, cx, G, cz, w, h, d, S.CONCRETE, col)
+	_cornice(id, cx, cz, w, d, G + h, col.darkened(0.12))
+	part(id, M.BOX, cx - w * 0.2, G + h + 1.6, cz, 6.0, 4.0, 6.0, S.CONCRETE, col.darkened(0.2), false, 0.0, false) # stair bulkhead
+	if rng.randf() < 0.5:
+		_water_tank(id, cx + w * 0.2, cz + d * 0.15, G + h + 1.6)
+	_roof_extras(id, cx, cz, w, d, G + h + 1.6, h, kid)
 	end(id)
 
 
 func _civic(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
 	var col: Color = _c(STONE_COLS).lightened(0.1)
+	_plinth(id, cx, cz, w, d, col)
 	part(id, M.BOX, cx, G, cz, w, h * 0.65, d, S.CIVIC, col)
-	var tier := part(id, M.BOX, cx, G + h * 0.65, cz, w * 0.7, h * 0.35, d * 0.7, S.CIVIC, col)
-	part(id, M.CONE, cx, G + h, cz, w * 0.6, h * 0.25, d * 0.6, S.ROOF, Color(0.3, 0.45, 0.4), false, 0.0, false)
+	_cornice(id, cx, cz, w, d, G + h * 0.65, col.darkened(0.1))
+	var tier := part(id, M.BOX, cx, G + h * 0.65 + 1.6, cz, w * 0.7, h * 0.35 - 1.6, d * 0.7, S.CIVIC, col)
+	_cornice(id, cx, cz, w * 0.7, d * 0.7, G + h, col.darkened(0.1))
+	# Portico: steps, a row of columns and a pediment on the front (+z) face.
+	var ch := clampf(h * 0.3, 10.0, 24.0)
+	var span := w * 0.6
+	var fz := cz + d * 0.5
+	for k in 3:
+		_trim(id, cx, fz + 3.5 - k * 1.1, span + 4.0 - k * 1.0, 2.2 + k * 1.1, G + 0.6 * k, 0.6, col.darkened(0.15))
+	var ncol := clampi(int(span / 6.0), 4, 9)
+	for k in ncol:
+		part(id, M.CYL, cx - span * 0.5 + (k + 0.5) * span / ncol, G + 1.8, fz + 2.0, 1.7, ch, 1.7, S.TRIM, col.lightened(0.05), false, 0.0, false)
+	_trim(id, cx, fz + 2.0, span + 2.0, 4.8, G + 1.8 + ch, 1.6, col.darkened(0.1))
+	part(id, M.PRISM, cx, G + 3.4 + ch, fz + 2.0, 4.8, 5.0, span + 2.0, S.TRIM, col.darkened(0.05), false, PI * 0.5, false)
+	# Dome.
+	var dm := minf(w, d) * 0.3
+	part(id, M.OCT, cx, G + h, cz, dm * 1.1, h * 0.1, dm * 1.1, S.CIVIC, col, false, 0.0, false)
+	part(id, M.CONE, cx, G + h + h * 0.1, cz, dm * 1.0, h * 0.2, dm * 1.0, S.ROOF, Color(0.3, 0.5, 0.42), false, 0.0, false)
 	end(id)
 	b_tier[id] = tier
 
@@ -501,10 +651,29 @@ func _tenement(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> 
 	var col: Color = _c(BRICK_COLS)
 	var bw := w * rng.randf_range(0.6, 0.85)
 	var bd := d * rng.randf_range(0.6, 0.85)
-	part(id, M.BOX, cx, G, cz, bw, h, bd, S.BRICK, col)
-	part(id, M.CYL, cx + bw * 0.2, G + h, cz, 6.0, 7.0, 6.0, S.METAL, Color(0.45, 0.32, 0.22), false, 0.0, false)
-	part(id, M.BOX, cx - bw * 0.25, G + h, cz, 4.0, 3.0, 5.0, S.METAL, Color(0.5, 0.5, 0.52), false, 0.0, false)
+	var stone: Color = _c(STONE_COLS)
+	_plinth(id, cx, cz, bw, bd, stone)
+	var tier := -1
+	if h > 50.0 and rng.randf() < 0.45:
+		var h1 := h * 0.78
+		part(id, M.BOX, cx, G, cz, bw, h1, bd, S.BRICK, col)
+		_cornice(id, cx, cz, bw, bd, G + h1, stone)
+		tier = part(id, M.BOX, cx, G + h1 + 1.6, cz, bw * 0.72, h * 0.22, bd * 0.72, S.BRICK, col.lightened(0.04))
+		_cornice(id, cx, cz, bw * 0.72, bd * 0.72, G + h1 + 1.6 + h * 0.22, stone)
+		h = h1 + 1.6 + h * 0.22
+	else:
+		part(id, M.BOX, cx, G, cz, bw, h, bd, S.BRICK, col)
+		_cornice(id, cx, cz, bw, bd, G + h, stone)
+	# Fire escapes zig-zagging up the street face.
+	var ne := 2 if bw > 44.0 else 1
+	for k in ne:
+		var ex := cx + (-0.22 + 0.44 * k if ne == 2 else rng.randf_range(-0.25, 0.25)) * bw
+		part(id, M.BOX, ex, G + 3.0, cz + bd * 0.5 + 0.35, 2.4, minf(h, 90.0) - 6.0, 0.7, S.ESCAPE, Color.WHITE, false, 0.0, false)
+	if rng.randf() < 0.55:
+		_water_tank(id, cx + bw * 0.2, cz - bd * 0.15, G + h + 1.6)
+	part(id, M.CYL, cx - bw * 0.25, G + h + 1.6, cz, 3.0, 6.0, 3.0, S.METAL, Color(0.45, 0.32, 0.22), false, 0.0, false)
 	end(id)
+	b_tier[id] = tier
 
 
 func _gable(id: int, cx: float, cz: float, w: float, d: float, y0: float, rh: float, col: Color) -> void:
@@ -519,7 +688,12 @@ func _warehouse(cx: float, cz: float, w: float, d: float, kid: int) -> void:
 	var col: Color = _c(INDUSTRIAL_COLS)
 	var hh := rng.randf_range(10.0, 20.0)
 	part(id, M.BOX, cx, G, cz, w, hh, d, S.INDUSTRIAL, col)
-	_gable(id, cx, cz, w, d, G + hh, rng.randf_range(4.0, 7.0), col.darkened(0.25))
+	_trim(id, cx, cz, w + 1.0, d + 1.0, G, 1.2, col.darkened(0.3))
+	var rh := rng.randf_range(4.0, 7.0)
+	_gable(id, cx, cz, w, d, G + hh, rh, col.darkened(0.25))
+	for k in rng.randi_range(2, 4): # roof vents along the ridge
+		part(id, M.BOX, cx + (rng.randf() - 0.5) * w * 0.7 if w < d else cx, G + hh + rh * 0.7, cz + (rng.randf() - 0.5) * d * 0.7 if w >= d else cz, 2.2, 2.0, 2.2, S.METAL, Color(0.55, 0.56, 0.58), false, 0.0, false)
+	part(id, M.BOX, cx - w * 0.3, G, cz + d * 0.5 + 2.5, w * 0.3, 4.5, 5.0, S.CONCRETE, Color(0.5, 0.5, 0.52), false, 0.0, false) # loading dock
 	end(id)
 
 
@@ -564,8 +738,18 @@ func _houses(cx: float, cz: float, w: float, d: float, kid: int) -> void:
 			var hd := minf(d / nz - 7.0, rng.randf_range(10.0, 16.0))
 			var hh := rng.randf_range(5.5, 9.0) if rng.randf() < 0.6 else rng.randf_range(9.0, 13.5) # some two-and-a-half storeys
 			var id := begin(px, pz, kid)
-			part(id, M.BOX, px, G, pz, hw, hh, hd, S.HOUSE, _c(PASTEL))
-			_gable(id, px, pz, hw, hd, G + hh, rng.randf_range(2.5, 4.5), _c(ROOF_COLS))
+			var wall: Color = _c(PASTEL)
+			var roof: Color = _c(ROOF_COLS)
+			part(id, M.BOX, px, G, pz, hw, hh, hd, S.HOUSE, wall)
+			_gable(id, px, pz, hw, hd, G + hh, rng.randf_range(2.5, 4.5), roof)
+			if rng.randf() < 0.6: # attached garage
+				var gw := hw * 0.42
+				var gx := px + hw * 0.5 + gw * 0.5 - 0.5 if rng.randf() < 0.5 else px - hw * 0.5 - gw * 0.5 + 0.5
+				part(id, M.BOX, gx, G, pz + hd * 0.1, gw, 3.6, hd * 0.8, S.HOUSE, wall.darkened(0.08), false, 0.0, false)
+				part(id, M.BOX, gx, G + 3.6, pz + hd * 0.1, gw + 0.8, 0.5, hd * 0.8 + 0.8, S.ROOF, roof, false, 0.0, false)
+			if rng.randf() < 0.7: # front porch with its own little roof
+				part(id, M.BOX, px, G, pz + hd * 0.5 + 1.4, hw * 0.34, 0.5, 2.8, S.TRIM, Color(0.7, 0.68, 0.62), false, 0.0, false)
+				part(id, M.BOX, px, G + 3.2, pz + hd * 0.5 + 1.4, hw * 0.4, 0.5, 3.2, S.ROOF, roof.darkened(0.1), false, 0.0, false)
 			if rng.randf() < 0.3:
 				part(id, M.BOX, px + hw * 0.25, G + hh, pz, 1.6, 5.0, 1.6, S.BRICK, Color(0.5, 0.3, 0.25), false, 0.0, false)
 			end(id)
@@ -612,6 +796,31 @@ func _prism_mesh() -> ArrayMesh:
 	return st.commit()
 
 
+## A prism with n flat faces (apothem 0.5, so faces sit on the unit box) whose top is scaled by `top`:
+## 8 / 1.0 = octagonal tower, 4 / 0.72 = tapered block, 4 / 0 = pyramid.
+func _poly_mesh(n: int, top: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var w := Color.WHITE
+	var r := 0.5 / cos(PI / n)
+	var rt := r * top
+	var inset := 0.5 * (1.0 - top)
+	for k in n:
+		var a0 := (k - 0.5) * TAU / n
+		var a1 := (k + 0.5) * TAU / n
+		var mid := k * TAU / n
+		var nn := Vector3(cos(mid), inset, sin(mid)).normalized()
+		var p0 := Vector3(cos(a0) * r, -0.5, sin(a0) * r)
+		var p1 := Vector3(cos(a1) * r, -0.5, sin(a1) * r)
+		var t0 := Vector3(cos(a0) * rt, 0.5, sin(a0) * rt)
+		var t1 := Vector3(cos(a1) * rt, 0.5, sin(a1) * rt)
+		_tri(st, p0, p1, t1, nn, w)
+		if top > 0.001:
+			_tri(st, p0, t1, t0, nn, w)
+			_tri(st, Vector3(0, 0.5, 0), t0, t1, Vector3.UP, w)
+	return st.commit()
+
+
 func _tree_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -651,6 +860,12 @@ func _unit_mesh(mk: int) -> Mesh:
 			return _prism_mesh()
 		M.CONE:
 			return MeshKit.cyl(0.0, 0.5, 1.0, 8)
+		M.OCT:
+			return _poly_mesh(8, 1.0)
+		M.FRUST:
+			return _poly_mesh(4, 0.72)
+		M.PYR:
+			return _poly_mesh(4, 0.0)
 	return MeshKit.box(Vector3.ONE)
 
 
@@ -875,7 +1090,7 @@ func _promote(b: int) -> void:
 	for i in b_pn[b]:
 		var pi := b_p0[b] + i
 		var mk := p_kind[pi]
-		if mk == M.PRISM or mk == M.CONE:
+		if mk == M.PRISM or mk == M.CONE or mk == M.PYR:
 			_hide_original(pi)
 		elif p_rast[pi] == 0:
 			continue # props (antennas, signs, AC units) stay put unless the roof under them goes
@@ -976,6 +1191,10 @@ func damage_at(p: Vector3, power := 1.0) -> Vector3:
 		smoke = Vector3(p.x, maxf(p.y, base.y), p.z)
 		roof_hit = true
 		_add_rubble(xf.origin.x, xf.origin.z, sc.x * 0.5, sc.z * 0.5, base.y + 2.0, 3)
+		for i in b_pn[b]:
+			var pi := p0 + i # crowns, masts and tanks on the broken section go with it
+			if p_rast[pi] == 0 and pi != tier and p_xf[pi].origin.y > base.y + 4.5:
+				_hide_part(pi)
 	elif p.y > top_y - 22.0 * power or b_h[b] < 45.0:
 		var xf := p_xf[top_pi]
 		var sc := xf.basis.get_scale()
@@ -989,7 +1208,7 @@ func damage_at(p: Vector3, power := 1.0) -> Vector3:
 			# Props standing on that roof go with it.
 			for i in b_pn[b]:
 				var pi := p0 + i
-				if p_rast[pi] == 0 and p_xf[pi].origin.y > top_y + 0.5 and p_kind[pi] != M.PRISM and p_kind[pi] != M.CONE:
+				if p_rast[pi] == 0 and p_xf[pi].origin.y > top_y + 0.5 and p_kind[pi] != M.PRISM and p_kind[pi] != M.CONE and p_kind[pi] != M.PYR:
 					_hide_part(pi)
 		else:
 			_set_part(top_pi, xf, col, p_cus[top_pi])

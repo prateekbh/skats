@@ -29,6 +29,7 @@ varying float damaged;
 varying float top;
 varying float roof_burnt;
 varying float dent;
+varying vec3 half_ext; // half size of the part (metres), for corner details
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -45,6 +46,7 @@ void vertex() {
 	}
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	lp = VERTEX * scl;
+	half_ext = use_uniforms ? vec3(1.0e4) : scl * 0.5;
 	ln = NORMAL;
 	v_style = floor(cus.x + 0.001);
 	seed = fract(cus.x + 0.001);
@@ -125,6 +127,15 @@ void fragment() {
 	}
 	float v = lp.y + part_h * 0.5;
 	bool top_face = ln.y > 0.7;
+	if (st == 13) {
+		// Fire escape: rails, landings and a stair stripe; everything else is see-through.
+		float rail = step(0.95, abs(u));
+		float landing = step(fract(v / 3.1), 0.09);
+		float stair = step(abs(fract((v - u * 1.1) / 3.1) - 0.5), 0.035) * step(abs(u), 0.95) * step(0.09, fract(v / 3.1));
+		if (max(rail, max(landing, stair)) < 0.5 || top_face) {
+			discard;
+		}
+	}
 	// Per-building character from the seed: an accent colour (awnings, trim) and a window-light bias.
 	float gy = world_pos.y - 0.7; // height above the street
 	float acc_h = hash(vec2(seed * 91.7, 3.1));
@@ -140,6 +151,9 @@ void fragment() {
 	float rough = 0.85;
 	float metal = 0.0;
 	float burnt = scorch(world_pos);
+	float winm = 0.0; // 1 inside a window
+	vec2 wf = vec2(0.5); // position in the window cell
+	vec4 wb = vec4(0.0); // window rectangle in the cell: x0, x1, y0, y1
 
 	if (st == 7) {
 		// Lot pad: paving with expansion joints, lawn for green pads.
@@ -147,6 +161,14 @@ void fragment() {
 		float joint = step(g.x, 0.025) + step(g.y, 0.025);
 		bool green = wall.g > wall.r * 1.15;
 		alb = top_face ? (green ? wall * (0.9 + 0.2 * hash(floor(world_pos.xz / 14.0))) : wall * (1.0 - 0.22 * min(joint, 1.0))) : wall * 0.5;
+	} else if (st == 12) {
+		// Stone trim: plinths and cornices, faint block joints.
+		alb = wall * (0.94 + 0.1 * hash(floor(vec2(u, v) / 1.6)));
+		alb *= 1.0 - 0.12 * step(fract(v / 1.6), 0.06);
+		if (!top_face) {
+			alb *= 0.8 + 0.2 * smoothstep(0.0, 1.0, v / max(part_h, 0.5));
+		}
+		rough = 0.8;
 	} else if (st == 8) {
 		alb = wall * 0.25;
 		emi = wall * 2.4;
@@ -166,6 +188,7 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.07, f.x) * step(f.x, 0.93) * step(0.1, f.y) * step(f.y, 0.9);
+		winm = win; wf = f; wb = vec4(0.07, 0.93, 0.1, 0.9);
 		float on = step(0.7, hash(id + seed * 113.0));
 		vec3 glass = mix(wall * 0.72, vec3(0.06, 0.1, 0.18), 0.15);
 		float refl = smoothstep(0.35, 1.0, sin(v * 0.035 + u * 0.012 + seed * 20.0));
@@ -180,6 +203,7 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.3, f.x) * step(f.x, 0.7) * step(0.18, f.y) * step(f.y, 0.82) * step(4.8, v);
+		winm = win; wf = f; wb = vec4(0.3, 0.7, 0.18, 0.82) * step(4.8, v);
 		float on = step(0.68, hash(id + seed * 113.0));
 		float band = step(fract(v / 21.0), 0.035);
 		vec3 stone = wall * (1.0 - 0.18 * band - 0.1 * step(f.x, 0.08));
@@ -194,6 +218,7 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.28, f.x) * step(f.x, 0.72) * step(0.22, f.y) * step(f.y, 0.78) * step(3.2, v);
+		winm = win; wf = f; wb = vec4(0.28, 0.72, 0.22, 0.78) * step(3.2, v);
 		float sill = step(0.18, f.y) * step(f.y, 0.22) * step(0.26, f.x) * step(f.x, 0.74) * step(3.2, v);
 		float on = step(0.65, hash(id + seed * 113.0));
 		vec3 b = wall * (1.0 - 0.28 * min(brick, 1.0)) * (0.9 + 0.2 * hash(vec2(row, floor(u / 0.56))));
@@ -206,6 +231,7 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.3, f.y) * step(f.y, 0.72) * step(0.04, f.x) * step(4.0, v);
+		winm = win; wf = f; wb = vec4(0.04, 1.0, 0.3, 0.72) * step(4.0, v);
 		float on = step(0.68, hash(id + seed * 113.0));
 		alb = mix(wall * (0.92 + 0.12 * hash(floor(vec2(u, v) / 3.0))), vec3(0.05, 0.07, 0.1), win);
 		emi = lightc(id, bias) * win * on * 1.1;
@@ -224,6 +250,7 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.3, f.x) * step(f.x, 0.7) * step(0.3, f.y) * step(f.y, 0.72) * step(0.5, hash(id + seed * 31.0));
+		winm = win; wf = f; wb = vec4(0.3, 0.7, 0.3, 0.72);
 		float shutter = step(0.16, f.x) * step(f.x, 0.84) * step(0.28, f.y) * step(f.y, 0.74) * (1.0 - win);
 		alb = mix(wall, vec3(0.06, 0.07, 0.1), win);
 		alb = mix(alb, wall * 0.55, shutter * step(0.5, abs(f.x - 0.5) * 2.0 + 0.3));
@@ -234,6 +261,7 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.34, f.x) * step(f.x, 0.66) * step(0.12, f.y) * step(f.y, 0.82) * step(5.0, v);
+		winm = win; wf = f; wb = vec4(0.34, 0.66, 0.12, 0.82) * step(5.0, v);
 		float cornice = step(fract(v / 20.8), 0.05);
 		vec3 stone = wall * (1.0 - 0.2 * cornice) * (0.94 + 0.12 * hash(floor(vec2(u, v) / 2.5)));
 		alb = mix(stone, vec3(0.06, 0.07, 0.1), win);
@@ -253,6 +281,38 @@ void fragment() {
 		rough = 0.6;
 	}
 
+	if (!top_face && !round_s && wb.y > 0.0 && st != 0 && st != 2) {
+		// Stone sills under the windows.
+		float sill = step(wb.z - 0.07, wf.y) * step(wf.y, wb.z) * step(wb.x - 0.04, wf.x) * step(wf.x, wb.y + 0.04) * (1.0 - winm);
+		alb = mix(alb, wall * 1.3 + 0.05, sill);
+	}
+	if (!top_face && winm > 0.5 && st != 0) {
+		// Recessed windows: a frame, a shadow under the lintel and down one jamb.
+		vec2 wn = vec2((wf.x - wb.x) / max(wb.y - wb.x, 0.01), (wf.y - wb.z) / max(wb.w - wb.z, 0.01));
+		float frame = 1.0 - step(0.07, wn.x) * step(wn.x, 0.93) * step(0.06, wn.y) * step(wn.y, 0.94);
+		float lint = smoothstep(0.7, 1.0, wn.y);
+		float shade = 1.0 - 0.55 * lint - 0.25 * smoothstep(0.85, 1.0, wn.x);
+		alb *= shade;
+		emi *= 1.0 - 0.5 * lint;
+		alb = mix(alb, st == 2 ? wall * 0.5 : vec3(0.72, 0.69, 0.63), frame * 0.75);
+		emi *= 1.0 - frame;
+	}
+	if (!top_face && !round_s && abs(ln.y) < 0.05 && min(abs(ln.x), abs(ln.z)) < 0.05) {
+		// Corners: alternating long and short quoin stones, or a dark steel fin on glass towers.
+		float ed = abs(ln.x) > abs(ln.z) ? half_ext.z - abs(lp.z) : half_ext.x - abs(lp.x);
+		if (st == 0) {
+			float fin = step(ed, 0.8);
+			alb = mix(alb, wall * 0.28, fin);
+			emi *= 1.0 - fin;
+			metal = max(metal, fin * 0.6);
+		} else if (st == 1 || st == 2 || st == 3 || st == 9) {
+			float row = floor(v / 1.5);
+			float q = step(ed, mod(row, 2.0) < 0.5 ? 1.7 : 0.9) * step(2.5, v);
+			alb = mix(alb, wall * 1.22 + 0.04, q);
+			alb *= 1.0 - 0.18 * q * step(fract(v / 1.5), 0.07);
+			emi *= 1.0 - q;
+		}
+	}
 	if (!top_face && (st == 0 || st == 1 || st == 2 || st == 3 || st == 9)) {
 		// Weathering: grime near the street, rain streaks, a lighter parapet under the roof edge.
 		float streak = hash(vec2(floor(u * 1.7), seed * 31.0));
@@ -260,6 +320,9 @@ void fragment() {
 		float rain = 1.0 - 0.18 * step(0.55, streak) * (1.0 - clamp(v / max(part_h, 1.0), 0.0, 1.0));
 		alb *= dirt * rain;
 		alb = mix(alb, wall * 1.2, 0.55 * step(part_h - 1.4, v));
+		if (st != 0) {
+			alb *= 1.0 - 0.3 * step(part_h - 3.4, v) * step(v, part_h - 1.4); // shadow under the parapet
+		}
 		// Ground-floor shops: lit glass, a coloured striped awning above.
 		if (gy < 5.4) {
 			float sf = fract(u / 6.0);
@@ -286,6 +349,11 @@ void fragment() {
 		alb = mix(alb * 0.18, vec3(0.03), 0.4);
 		emi = emi * step(0.75, hash(floor(vec2(u, v) / 3.0) + seed)) * vec3(1.0, 0.45, 0.12) * flicker;
 		metal = 0.0;
+	}
+	if (st == 13) {
+		alb = vec3(0.05, 0.05, 0.06);
+		metal = 0.3;
+		rough = 0.6;
 	}
 	ALBEDO = alb * (1.0 - dent * 0.6) * (top_face || st == 7 || st == 8 ? 1.0 : 1.18);
 	EMISSION = emi;
