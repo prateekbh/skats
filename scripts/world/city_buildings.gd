@@ -66,6 +66,8 @@ var p_inst := PackedInt32Array()
 var p_rast := PackedByteArray()
 var p_yaw := PackedFloat32Array()
 
+## Overhead solids a pilot can fly under (bridge decks): {c: Vector2, half: Vector2, yaw, y0, y1}.
+var slabs: Array[Dictionary] = []
 var cache_spots: Array[Dictionary] = []
 var counts := {}
 ## Every street lane of every district: {a, b, width, avenue, kind}. Tools fly and measure these.
@@ -86,6 +88,7 @@ var _rubble: MultiMesh
 var _rubble_n := 0
 var _tree_pts: Array[Vector4] = [] # x, y, z, scale
 var _lamp_n := 0
+var _cur := {} # the district being generated
 var _gaps := PackedFloat32Array() # (centre, width, avenue) of each gap the last _strips() made
 
 
@@ -185,12 +188,14 @@ func _lot_color(kname: String) -> Color:
 
 func _district(kname: String, kid: int, p: Dictionary) -> void:
 	rng.seed = int(plan.data.get("seed", 1993)) * 31 + kid
+	_cur = p
 	var bb := plan.bbox[kid]
 	var strip: Array = p.strip
 	var gap: Array = p.gap
 	var xs := _strips(bb.position.x, bb.end.x, strip, gap, int(p.avenue_every), p.avenue)
 	var xg := _gaps.duplicate()
-	var zs := _strips(bb.position.y, bb.end.y, strip, gap, int(p.avenue_every), p.avenue)
+	# Blocks can be longer one way than the other, like Manhattan's: strip_z is the depth.
+	var zs := _strips(bb.position.y, bb.end.y, p.get("strip_z", strip), gap, int(p.avenue_every), p.avenue)
 	var zg := _gaps.duplicate()
 	for i in xg.size() / 3:
 		_add_lanes(Vector2(xg[i * 3], bb.position.y), Vector2(xg[i * 3], bb.end.y), kid, xg[i * 3 + 1], xg[i * 3 + 2] > 0.5, kname)
@@ -535,17 +540,18 @@ func _containers(cx: float, cz: float, w: float, d: float, kid: int) -> void:
 
 
 func _houses(cx: float, cz: float, w: float, d: float, kid: int) -> void:
-	var nx := clampi(int(w / 44.0), 1, 4)
-	var nz := clampi(int(d / 42.0), 1, 4)
+	var plot: Array = _cur.get("plot", [44, 42])
+	var nx := clampi(int(w / float(plot[0])), 1, 5)
+	var nz := clampi(int(d / float(plot[1])), 1, 5)
 	for ix in nx:
 		for iz in nz:
-			if rng.randf() < 0.1:
+			if rng.randf() < 0.05:
 				continue
 			var px := cx - w * 0.5 + (ix + 0.5) * w / nx + rng.randf_range(-3.0, 3.0)
 			var pz := cz - d * 0.5 + (iz + 0.5) * d / nz + rng.randf_range(-3.0, 3.0)
-			var hw := minf(w / nx - 10.0, rng.randf_range(14.0, 24.0))
-			var hd := minf(d / nz - 10.0, rng.randf_range(11.0, 17.0))
-			var hh := rng.randf_range(5.5, 9.0)
+			var hw := minf(w / nx - 7.0, rng.randf_range(13.0, 22.0))
+			var hd := minf(d / nz - 7.0, rng.randf_range(10.0, 16.0))
+			var hh := rng.randf_range(5.5, 9.0) if rng.randf() < 0.6 else rng.randf_range(9.0, 13.5) # some two-and-a-half storeys
 			var id := begin(px, pz, kid)
 			part(id, M.BOX, px, G, pz, hw, hh, hd, S.HOUSE, PASTEL[rng.randi() % PASTEL.size()])
 			_gable(id, px, pz, hw, hd, G + hh, rng.randf_range(2.5, 4.5), ROOF_COLS[rng.randi() % ROOF_COLS.size()])
@@ -767,6 +773,24 @@ func height_at(x: float, z: float) -> float:
 	if x >= -plan.half.x and z >= -plan.half.y and gx < gw and gz < gh:
 		h = maxf(h, hgrid[gz * gw + gx])
 	return h
+
+
+func add_slab(cx: float, cz: float, sx: float, sz: float, yaw: float, y0: float, y1: float) -> void:
+	slabs.append({"c": Vector2(cx, cz), "half": Vector2(sx, sz) * 0.5, "cos": cos(yaw), "sin": sin(yaw), "y0": y0, "y1": y1})
+
+
+## True if `p` is inside a bridge deck (the height grid can't hold a solid with space beneath it).
+func overhang_hit(p: Vector3) -> bool:
+	for sl: Dictionary in slabs:
+		if p.y < float(sl.y0) or p.y > float(sl.y1):
+			continue
+		var c: Vector2 = sl.c
+		var hs: Vector2 = sl.half
+		var dx: float = p.x - c.x
+		var dz: float = p.z - c.y
+		if absf(float(sl.cos) * dx - float(sl.sin) * dz) <= hs.x and absf(float(sl.sin) * dx + float(sl.cos) * dz) <= hs.y:
+			return true
+	return false
 
 
 func building_at(x: float, z: float) -> int:

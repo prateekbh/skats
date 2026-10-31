@@ -334,27 +334,31 @@ func _docks() -> void:
 
 func _bridges() -> void:
 	var orange := Color(0.82, 0.36, 0.14)
-	for br: Array in city.plan.data.get("bridges", []):
-		var a := CityPlan.pt([br[0], br[1]])
-		var e := CityPlan.pt([br[2], br[3]])
-		var span := e - a
-		var length := span.length()
-		var yaw := -atan2(span.y, span.x)
-		var mid := (a + e) * 0.5
-		var id := b.begin(mid.x, mid.y, CityPlan.K.CLEAR, CityBuildings.FIXED)
-		# The deck is not solid in the collision grid, so the river stays a flight corridor.
-		b.part(id, M.BOX, mid.x, 34.0, mid.y, length, 3.5, 36.0, S.METAL, orange, false, yaw, false)
-		var dir := span / length
+	for br: Dictionary in city.plan.data.get("bridges", []):
+		var mid := CityPlan.pt(br.c)
+		var length := float(br.len)
+		var deck_y := float(br.get("h", 95.0))
+		var dir_a := deg_to_rad(float(br.get("dir", 0.0)))
+		var dir := Vector2(cos(dir_a), sin(dir_a))
 		var lat := Vector2(-dir.y, dir.x)
+		var yaw := -dir_a
+		var id := b.begin(mid.x, mid.y, CityPlan.K.CLEAR, CityBuildings.FIXED)
+		# A high deck over the river: you can fly beneath it (the span is solid for anything that
+		# tries to go through it), held up by piers at both ends and tall pylons on the banks.
+		b.part(id, M.BOX, mid.x, deck_y - 2.0, mid.y, length, 4.0, 36.0, S.METAL, orange, false, yaw, false)
+		b.add_slab(mid.x, mid.y, length, 36.0, yaw, deck_y - 2.5, deck_y + 2.5)
+		b.part(id, M.BOX, mid.x, deck_y + 2.0, mid.y, length, 1.0, 36.0, S.METAL, Color(0.3, 0.3, 0.32), false, yaw, false)
 		for rail: float in [-1.0, 1.0]:
 			var rp := mid + lat * rail * 17.5
-			b.part(id, M.BOX, rp.x, 37.5, rp.y, length, 1.6, 0.8, S.METAL, orange.darkened(0.2), false, yaw, false)
-		for t: float in [0.25, 0.75]:
-			var pp := a + span * t
+			b.part(id, M.BOX, rp.x, deck_y + 3.0, rp.y, length, 1.8, 0.8, S.METAL, orange.darkened(0.2), false, yaw, false)
+		for end_s: float in [-1.0, 1.0]:
+			var ep := mid + dir * end_s * (length * 0.5 - 8.0)
+			b.part(id, M.BOX, ep.x, -8.0, ep.y, 16.0, deck_y + 8.0, 40.0, S.METAL, Color(0.5, 0.5, 0.48), false, yaw)
+			var pp := mid + dir * end_s * 250.0
 			for side: float in [-1.0, 1.0]:
 				var tp := pp + lat * side * 15.0
-				b.part(id, M.BOX, tp.x, 0.0, tp.y, 7.0, 112.0, 7.0, S.METAL, orange, false, yaw)
-			b.part(id, M.BOX, pp.x, 100.0, pp.y, 9.0, 8.0, 40.0, S.METAL, orange, false, yaw, false)
+				b.part(id, M.BOX, tp.x, -2.0, tp.y, 8.0, deck_y + 150.0, 8.0, S.METAL, orange, false, yaw)
+			b.part(id, M.BOX, pp.x, deck_y + 130.0, pp.y, 10.0, 8.0, 40.0, S.METAL, orange, false, yaw, false)
 		b.end(id)
 
 
@@ -365,7 +369,7 @@ func _extras() -> void:
 	var dc := CityPlan.pt(dam.c)
 	var len := float(dam.len)
 	var id := b.begin(dc.x, dc.y, CityPlan.K.CLEAR, CityBuildings.FIXED)
-	b.part(id, M.BOX, dc.x, -6.0, dc.y, len, 56.0, 40.0, S.CONCRETE, Color(0.62, 0.62, 0.6))
+	b.part(id, M.BOX, dc.x, -6.0, dc.y, len, 56.0, 40.0, S.METAL, Color(0.6, 0.6, 0.58))
 	b.part(id, M.BOX, dc.x, 50.0, dc.y, len, 2.0, 46.0, S.METAL, Color(0.5, 0.5, 0.52), false, 0.0, false)
 	b.end(id)
 	# Lighthouse on its island.

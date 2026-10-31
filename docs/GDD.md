@@ -149,19 +149,23 @@ with `--citymap` and measure it with `--citycheck` (see CLAUDE.md); nothing else
 
 | District | What it is | Street gaps |
 |---|---|---|
-| Downtown core | Tower clusters with a skyline hierarchy; MegaKat Tower (~1,200 m, 300 storeys) and City Hall (~250 m, working clock) | 100-160 m, avenues 170-220 m |
-| Commercial high-rise | Glass towers, podium towers, twin towers with sky-bridges, round towers | 100-160 m |
-| Civic + Enforcer | Stone civic blocks around Enforcer HQ (~300 m, shield emblem) | 80-130 m |
-| Residential + suburb | Mid-rise brick and low-rise houses with gardens, tree-lined | 60-110 m |
-| Industrial waterfront + docks | Warehouses, factories, container yards, piers with gantry cranes and ships | 60-100 m |
-| Salvage yard | Jake & Chance's Garage (two-storey) in a scrapyard; the hangar hatch is below | 70-110 m |
+| Downtown core | A Manhattan of long blocks and towers of 140-520 m (about 90 over 300 m); MegaKat Tower (~1,200 m, 300 storeys) and City Hall (~250 m, working clock) | 45-80 m, avenues 100-140 m |
+| Commercial high-rise | Glass towers of 120-480 m, podium towers, twin towers with sky-bridges, round towers | 45-80 m |
+| Civic + Enforcer | Stone civic blocks around Enforcer HQ (~300 m, shield emblem) | 50-85 m |
+| Residential | Brick mid-rise (25-110 m) with rows of houses | 40-65 m |
+| Suburb | Packed rows of houses with gardens and trees | 32-52 m |
+| Industrial waterfront + docks | Warehouses, factories, container yards, piers with gantry cranes and ships | 40-65 m |
+| Salvage yard | Jake & Chance's Garage (two-storey) in a scrapyard; the hangar hatch is below | 45-75 m |
 | Park | A large open meadow with a lake and tree groves: a combat arena | none |
 | Outer wilds | Mountain ridges, a river with a dam, wetlands, beaches, islands, a lighthouse, the open sea | none |
 
-- **Spacing** follows the handoff: 60-100 m between ordinary buildings, 100-160 m between skyscrapers,
-  open plazas (200-400 m) left in the grid, 150-300 m waterfront corridors. Buildings stay inset from
-  district borders so two districts never pinch a street. Three bridges cross the river (their decks are
-  not solid, so the river stays a flight corridor) and there are no landing mechanics.
+- **Density and flyability:** the handoff's gaps (60-100 m, 100-160 m for skyscrapers) played too relaxed,
+  so the streets are tighter: 32-85 m, with wider avenues every few streets, in long Manhattan-style
+  blocks. The grid is continuous, so there are always several routes and no dead ends; `--flytest` flies
+  every district's narrowest street and widest avenue on the real controller. Open plazas are rare.
+  Buildings stay inset from district borders so two districts never pinch a street.
+- **Bridges:** three high bridges (deck 95 m up, pylons on the banks, piers at the ends) cross the river.
+  The deck is solid, so flying through it crashes, but the river beneath is a clear corridor.
 - **Looks:** twelve facade styles (glass curtain wall, art-deco stone, brick, concrete, industrial,
   house, civic limestone, painted metal, containers, neon signs...) and about a dozen building types
   built from boxes, cylinders, gable roofs and cones, with district palettes, rooftop props and street
@@ -175,7 +179,8 @@ with `--citymap` and measure it with `--citycheck` (see CLAUDE.md); nothing else
   bends. Thick smoke columns rise and the damage lasts until the next stage.
 - **Supply caches:** about fifty light-beam caches on streets, plazas, piers and in the park hold special
   missiles (two types, +2 each), a Blowtorch pack or repair; collect one by flying within 26 m and under
-  40 m above it. About a third are guarded by flak nests. They refill after 60 s and show on the radar.
+  40 m above it. In Free Flight about a third are guarded by flak nests; Episode 1 is planes only (the
+  mission opts out with `ground_guards()`). They refill after 60 s and show on the radar.
 - Landmark geometry is generated from the handoff's proposed proportions; check the silhouettes against
   series frames before polishing (only the 300-storey MegaKat Tower is a canon anchor).
 

@@ -72,6 +72,11 @@ func strips() -> Dictionary:
 	}
 
 
+## Episode 1 is planes only: no surface-to-air guns (the warship's own turrets aside).
+func ground_guards() -> bool:
+	return false
+
+
 func intro() -> Array:
 	return strips()["intro"]
 
@@ -126,7 +131,7 @@ func update(_dt: float) -> void:
 
 
 func _start_wave_2() -> void:
-	var center: Vector3 = main.city.city_hall_pos + Vector3(0, 260, 0)
+	var center: Vector3 = main.city.city_hall_pos + Vector3(0, 520, 0)
 	spawn_wave(center, 8, 2)
 	radio("T-Bone", "Bombers are slow, but they hit hard. Missiles, buddy!", 4.0, "grin")
 	# Callie stays at City Hall to run the evacuation; the Mayor does not.

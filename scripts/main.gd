@@ -347,9 +347,9 @@ func start_episode(ep: Dictionary, from_launch := false) -> void:
 	var heading := player.forward()
 	var launch_speed := player.speed
 	_clear_world()
-	combat.setup_caches(city.cache_spots)
 	mission = load(ep.script).new()
 	mission.main = self
+	combat.setup_caches(city.cache_spots, mission.ground_guards())
 	if keep:
 		player.reset(at, at + heading * 100.0)
 		player.speed = clampf(launch_speed, 130.0, 240.0)
@@ -632,6 +632,10 @@ func _fly_test() -> void:
 		picks.append(best_avenue[k])
 	for k in best_street:
 		picks.append(best_street[k])
+	# Under each bridge deck, along the river (the deck is 95 m up; fly at 50 m).
+	for br: Dictionary in city.plan.data.get("bridges", []):
+		var bc := CityPlan.pt(br.c)
+		picks.append({"a": bc + Vector2(0, -300), "b": bc + Vector2(0, 300), "width": 320.0, "avenue": true, "kind": "bridge", "len": 600.0, "y": float(br.get("h", 95.0)) - 45.0})
 	var clean := 0
 	for lane in picks:
 		var r := await _fly_lane(lane)
@@ -652,7 +656,7 @@ func _fly_lane(lane: Dictionary) -> Dictionary:
 	var a: Vector2 = lane.a
 	var b: Vector2 = lane.b
 	var dir := (b - a).normalized()
-	var y := 70.0
+	var y := float(lane.get("y", 70.0))
 	var start := Vector3(a.x, y, a.y)
 	player.reset(start, start + Vector3(dir.x, 0, dir.y) * 100.0)
 	player.speed = 190.0
@@ -1038,7 +1042,7 @@ func _weapon_test_step(delta: float) -> void:
 		return
 	_weapon_test_t = 3.0
 	var best: Target = null
-	var best_d := 900.0
+	var best_d := INF
 	for t in combat.targets:
 		var d := t.global_position.distance_to(player.global_position)
 		if t.alive and t.visible and d < best_d and d > 80.0 and t is Creepling:
@@ -1048,6 +1052,8 @@ func _weapon_test_step(delta: float) -> void:
 		return
 	var def: Dictionary = Arsenal.SPECIALS[_weapon_test_i % Arsenal.SPECIALS.size()]
 	_weapon_test_i += 1
+	if best_d > 700.0: # the targets are across the city: start the test within range
+		player.global_position = best.global_position + Vector3(0, 60, 450)
 	player.look_at(best.global_position, Vector3.UP)
 	player.special_ammo[def.id] = def.max
 	player.special_index = Arsenal.SPECIALS.find(def)

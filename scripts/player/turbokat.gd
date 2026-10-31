@@ -221,6 +221,9 @@ func _fly(dt: float) -> void:
 		else:
 			crash()
 			return
+	if not god_mode and city.buildings.overhang_hit(global_position):
+		crash() # flew into a bridge deck
+		return
 	var ahead := global_position + vel * 1.6
 	var mid := global_position + vel * 0.8
 	warn_pull_up = vel.y < -5.0 and (ahead.y < city.height_at(ahead.x, ahead.z) + 8.0 or mid.y < city.height_at(mid.x, mid.z) + 8.0)

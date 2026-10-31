@@ -52,7 +52,7 @@
 		"w": 70,
 		"list": [[-5.6, 0.0, 520], [-5.1, 0.55, 460], [-4.5, 1.0, 560], [-3.9, 1.35, 480], [-3.3, 1.75, 520], [-2.8, 2.3, 430], [-2.5, 2.9, 380]]
 	},
-	"bridges": [[3.4, -2.0, 5.6, -2.0], [3.6, 1.0, 5.8, 1.0], [3.4, 3.8, 5.6, 3.8]],
+	"bridges": [{"c": [4.48, -2.0], "len": 760, "dir": 0, "h": 95}, {"c": [4.89, 1.0], "len": 760, "dir": 0, "h": 95}, {"c": [4.75, 3.8], "len": 760, "dir": 0, "h": 95}],
 	"ridges": [
 		{"a": [-6.8, -4.3], "b": [-3.8, -4.8], "w": 1300, "h": 700},
 		{"a": [-3.0, -4.9], "b": [0.5, -5.0], "w": 1000, "h": 450},
@@ -65,19 +65,19 @@
 	"caches": {"downtown": 8, "commercial": 6, "civic": 4, "residential": 8, "suburb": 3, "industrial": 8, "salvage": 4, "park": 8, "guard_chance": 0.3},
 
 	"kinds": {
-		"downtown": {"strip": [90, 170], "gap": [100, 160], "avenue_every": 5, "avenue": [170, 220], "h": [60, 300], "clusters": 6, "cluster_r": 900, "plaza": 0.04, "big_plaza": 0.03,
-			"mix": {"glass": 0.32, "deco": 0.26, "podium": 0.18, "twin": 0.04, "round": 0.06, "slab": 0.14}},
-		"commercial": {"strip": [90, 150], "gap": [100, 160], "avenue_every": 4, "avenue": [170, 220], "h": [80, 330], "clusters": 5, "cluster_r": 800, "plaza": 0.04, "big_plaza": 0.03,
-			"mix": {"glass": 0.46, "podium": 0.2, "twin": 0.08, "round": 0.1, "slab": 0.16}},
-		"civic": {"strip": [100, 160], "gap": [80, 130], "avenue_every": 4, "avenue": [150, 200], "h": [30, 120], "clusters": 2, "cluster_r": 700, "plaza": 0.1, "big_plaza": 0.04,
-			"mix": {"civic": 0.5, "deco": 0.25, "tenement": 0.15, "slab": 0.1}},
-		"residential": {"strip": [110, 180], "gap": [60, 100], "avenue_every": 4, "avenue": [120, 160], "h": [10, 45], "clusters": 3, "cluster_r": 600, "plaza": 0.05, "big_plaza": 0.02,
-			"mix": {"houses": 0.62, "tenement": 0.28, "slab": 0.1}},
-		"suburb": {"strip": [110, 170], "gap": [70, 110], "avenue_every": 5, "avenue": [120, 160], "h": [7, 16], "clusters": 1, "cluster_r": 600, "plaza": 0.1, "big_plaza": 0.0,
-			"mix": {"houses": 0.9, "tenement": 0.1}},
-		"industrial": {"strip": [90, 160], "gap": [60, 100], "avenue_every": 4, "avenue": [130, 180], "h": [14, 40], "clusters": 1, "cluster_r": 800, "plaza": 0.08, "big_plaza": 0.0,
+		"downtown": {"strip": [80, 140], "strip_z": [150, 260], "gap": [45, 80], "avenue_every": 3, "avenue": [100, 140], "h": [140, 520], "clusters": 8, "cluster_r": 1100, "plaza": 0.02, "big_plaza": 0.015,
+			"mix": {"glass": 0.3, "deco": 0.3, "podium": 0.16, "twin": 0.06, "round": 0.06, "slab": 0.12}},
+		"commercial": {"strip": [80, 130], "strip_z": [140, 240], "gap": [45, 80], "avenue_every": 3, "avenue": [100, 140], "h": [120, 480], "clusters": 7, "cluster_r": 1000, "plaza": 0.02, "big_plaza": 0.015,
+			"mix": {"glass": 0.44, "podium": 0.2, "twin": 0.1, "round": 0.1, "slab": 0.16}},
+		"civic": {"strip": [90, 140], "strip_z": [120, 200], "gap": [50, 85], "avenue_every": 3, "avenue": [100, 140], "h": [40, 170], "clusters": 2, "cluster_r": 700, "plaza": 0.06, "big_plaza": 0.02,
+			"mix": {"civic": 0.45, "deco": 0.3, "tenement": 0.15, "slab": 0.1}},
+		"residential": {"strip": [90, 130], "strip_z": [100, 160], "gap": [40, 65], "avenue_every": 4, "avenue": [90, 120], "h": [25, 110], "clusters": 4, "cluster_r": 600, "plaza": 0.02, "big_plaza": 0.01, "plot": [36, 34],
+			"mix": {"houses": 0.3, "tenement": 0.5, "slab": 0.2}},
+		"suburb": {"strip": [80, 110], "strip_z": [80, 110], "gap": [32, 52], "avenue_every": 5, "avenue": [70, 90], "h": [7, 16], "clusters": 1, "cluster_r": 600, "plaza": 0.03, "big_plaza": 0.0, "plot": [30, 30],
+			"mix": {"houses": 0.92, "tenement": 0.08}},
+		"industrial": {"strip": [90, 150], "strip_z": [110, 200], "gap": [40, 65], "avenue_every": 4, "avenue": [90, 130], "h": [14, 45], "clusters": 1, "cluster_r": 800, "plaza": 0.04, "big_plaza": 0.0,
 			"mix": {"warehouse": 0.5, "factory": 0.22, "containers": 0.18, "slab": 0.1}},
-		"salvage": {"strip": [70, 130], "gap": [70, 110], "avenue_every": 4, "avenue": [130, 170], "h": [8, 22], "clusters": 1, "cluster_r": 800, "plaza": 0.3, "big_plaza": 0.0,
+		"salvage": {"strip": [70, 110], "gap": [45, 75], "avenue_every": 4, "avenue": [90, 120], "h": [8, 22], "clusters": 1, "cluster_r": 800, "plaza": 0.15, "big_plaza": 0.0,
 			"mix": {"warehouse": 0.6, "containers": 0.2, "houses": 0.2}}
 	}
 }

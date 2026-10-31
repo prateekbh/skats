@@ -142,7 +142,7 @@ func _on_target_died(t: Target) -> void:
 
 
 ## Creates the supply caches (and their flak nests) at the city's cache spots.
-func setup_caches(spots: Array) -> void:
+func setup_caches(spots: Array, guards := true) -> void:
 	_free_caches()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 91
@@ -154,7 +154,7 @@ func setup_caches(spots: Array) -> void:
 		cache.global_position = sp.pos
 		cache.setup(self, k, rng)
 		_caches.append(cache)
-		if sp.guarded:
+		if guards and sp.guarded:
 			for n in 2:
 				var a := rng.randf() * TAU
 				var nest := GroundFlak.new()
@@ -470,7 +470,7 @@ func _update_missiles(dt: float) -> void:
 					hit = tgt
 			else:
 				hit = first_hit(p0, p1, 3.0)
-		var struck := hit == null and p1.y < city.height_at(p1.x, p1.z)
+		var struck := hit == null and (p1.y < city.height_at(p1.x, p1.z) or city.buildings.overhang_hit(p1))
 		if hit or struck or m.life <= 0.0:
 			if struck:
 				p1 = _surface_point(p0, p1)

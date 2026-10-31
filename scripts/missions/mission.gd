@@ -13,6 +13,11 @@ func start() -> void:
 	pass
 
 
+## Whether supply caches are guarded by ground flak nests in this episode.
+func ground_guards() -> bool:
+	return true
+
+
 ## The opening story, played as comic-strip panels after the episode is chosen and before the
 ## hatch launch (see ComicStrip). Empty for episodes without one.
 func intro() -> Array:

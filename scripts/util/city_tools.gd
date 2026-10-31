@@ -104,11 +104,31 @@ static func citycheck(city: City) -> void:
 	for k in TARGETS:
 		print("[citycheck]   %-20s %5.1f km2   (handoff target %4.0f, scaled to our land %4.1f)" % [k, got[k], TARGETS[k], TARGETS[k] * land / 110.0])
 	print("[citycheck] buildings %d, parts %d, caches %d, lanes %d; plots per district %s" % [b.b_cx.size(), b.p_kind.size(), city.cache_spots.size(), b.lanes.size(), str(b.counts)])
+	var tall := {}
+	for id in b.b_cx.size():
+		if b.b_flags[id] & CityBuildings.FIXED == 0:
+			var k: String = CityPlan.KIND_NAMES[b.b_kind[id]]
+			if not tall.has(k):
+				tall[k] = [0, 0.0, 0.0, 0, 0]
+			var t: Array = tall[k]
+			t[0] += 1
+			t[1] += b.b_h[id]
+			t[2] = maxf(t[2], b.b_h[id])
+			t[3] += 1 if b.b_h[id] > 150.0 else 0
+			t[4] += 1 if b.b_h[id] > 300.0 else 0
+	for k in tall:
+		var t: Array = tall[k]
+		print("[citycheck]   %-12s %4d buildings, average %3.0f m, tallest %3.0f m, %3d over 150 m, %3d over 300 m" % [k, t[0], t[1] / t[0], t[2], t[3], t[4]])
 	var sloped := 0
 	for id in b.b_cx.size():
 		if b.b_flags[id] & CityBuildings.FIXED == 0 and absf(plan.terrain_h(b.b_cx[id], b.b_cz[id]) - CityPlan.LAND) > 2.0:
 			sloped += 1
 	print("[citycheck] buildings not on flat ground (more than 2 m off): %d of %d" % [sloped, b.b_cx.size()])
+	for br: Dictionary in plan.data.get("bridges", []):
+		var bc := CityPlan.pt(br.c)
+		var dh := float(br.get("h", 95.0))
+		print("[citycheck] bridge at (%.1f, %.1f) km: deck solid at %.0f m: %s, open at %.0f m beneath it: %s" % [
+			bc.x / 1000.0, bc.y / 1000.0, dh, b.overhang_hit(Vector3(bc.x, dh, bc.y)), dh - 45.0, not b.overhang_hit(Vector3(bc.x, dh - 45.0, bc.y))])
 	_gap_stats(city, 60.0)
 	_gap_stats(city, 150.0)
 	for alt in [40.0, 100.0, 200.0]:
