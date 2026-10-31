@@ -166,6 +166,12 @@ with `--citymap` and measure it with `--citycheck` (see CLAUDE.md); nothing else
   Buildings stay inset from district borders so two districts never pinch a street.
 - **Bridges:** three high bridges (deck 95 m up, pylons on the banks, piers at the ends) cross the river.
   The deck is solid, so flying through it crashes, but the river beneath is a clear corridor.
+- **Colour and realism:** each building draws from a wide palette (blue, teal, bronze, green, silver and
+  rose glass; limestone, sandstone, granite and brownstone; red, yellow and grey brick; pastel and white
+  houses) with a little hue and brightness jitter, and a per-building accent colour and window-light
+  bias (warm, white or cool, with the odd orange or TV-blue window). Facades have grime near the street,
+  rain streaks, lighter parapets, panels of slightly different tone, and lit ground-floor shops under
+  striped awnings. Residential and suburb ground is lawn all over, with no bare lanes between lots.
 - **Looks:** twelve facade styles (glass curtain wall, art-deco stone, brick, concrete, industrial,
   house, civic limestone, painted metal, containers, neon signs...) and about a dozen building types
   built from boxes, cylinders, gable roofs and cones, with district palettes, rooftop props and street

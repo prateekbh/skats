@@ -138,7 +138,10 @@ func _build_terrain() -> void:
 
 func _ground_color(x: float, z: float, h: float, ny: float, n: float) -> Color:
 	var k := plan.kind_at(x, z)
-	var urban := 1.0 if (k >= CityPlan.K.DOWNTOWN and k != CityPlan.K.PARK) else 0.0
+	var urban := 1.0 if (k >= CityPlan.K.DOWNTOWN and k != CityPlan.K.PARK and k != CityPlan.K.SUBURB and k != CityPlan.K.RESIDENTIAL) else 0.0
+	if k == CityPlan.K.SUBURB or k == CityPlan.K.RESIDENTIAL: # lawn all over, with no bare lanes between the lots
+		var lawn := Color(0.27, 0.45, 0.2).lerp(Color(0.31, 0.49, 0.22), n * 0.5 + 0.5)
+		return Color(lawn.r, lawn.g, lawn.b, 0.0)
 	var grass := Color(0.2, 0.34, 0.15).lerp(Color(0.34, 0.38, 0.17), n * 0.5 + 0.5)
 	if k == CityPlan.K.PARK:
 		var park := Color(0.26, 0.46, 0.2).lerp(Color(0.32, 0.52, 0.22), n * 0.5 + 0.5)

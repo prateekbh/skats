@@ -99,6 +99,14 @@ float scorch(vec3 p) {
 	return s;
 }
 
+// Window light colours: each building leans warm, white or cool; a few windows glow orange or blue (TV).
+vec3 lightc(vec2 id, float b) {
+	float r = hash(id * 1.31 + vec2(seed * 7.0, 2.0));
+	vec3 base = b < 0.35 ? vec3(1.0, 0.76, 0.42) : (b < 0.7 ? vec3(1.0, 0.96, 0.88) : vec3(0.62, 0.82, 1.0));
+	vec3 alt = r < 0.9 ? vec3(1.0, 0.55, 0.22) : vec3(0.5, 0.62, 1.0);
+	return mix(base, alt, step(0.78, r));
+}
+
 void fragment() {
 	int st = int(v_style);
 	bool round_s = st >= 20;
@@ -117,7 +125,14 @@ void fragment() {
 	}
 	float v = lp.y + part_h * 0.5;
 	bool top_face = ln.y > 0.7;
-	vec3 wall = base_col;
+	// Per-building character from the seed: an accent colour (awnings, trim) and a window-light bias.
+	float gy = world_pos.y - 0.7; // height above the street
+	float acc_h = hash(vec2(seed * 91.7, 3.1));
+	vec3 accent = clamp(vec3(0.5) + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + acc_h)), 0.0, 1.0);
+	accent = mix(vec3(0.55), accent, 0.7);
+	float bias = hash(vec2(seed * 17.3, 9.1));
+	// Panels of slightly different tone across the facade.
+	vec3 wall = base_col * (0.9 + 0.2 * hash(floor(vec2(u, v) / 7.0) + vec2(seed * 13.0, 5.0)));
 	vec3 warm = vec3(1.0, 0.76, 0.42);
 	vec3 cool = vec3(0.55, 0.8, 1.0);
 	vec3 alb = wall;
@@ -151,12 +166,12 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.07, f.x) * step(f.x, 0.93) * step(0.1, f.y) * step(f.y, 0.9);
-		float on = step(0.5, hash(id + seed * 113.0));
-		vec3 glass = mix(wall * 0.55, vec3(0.1, 0.2, 0.34), 0.5);
+		float on = step(0.7, hash(id + seed * 113.0));
+		vec3 glass = mix(wall * 0.72, vec3(0.06, 0.1, 0.18), 0.15);
 		float refl = smoothstep(0.35, 1.0, sin(v * 0.035 + u * 0.012 + seed * 20.0));
 		glass += vec3(0.32, 0.16, 0.1) * refl * 0.7 + vec3(0.1, 0.18, 0.28) * smoothstep(0.0, 1.0, v / max(part_h, 1.0)) * 0.5;
 		alb = mix(wall * 0.35, glass, win);
-		emi = mix(warm, cool, step(0.7, hash(id * 1.7 + seed * 31.0))) * win * on * step(4.8, v) * 1.5;
+		emi = lightc(id, bias) * win * on * step(4.8, v) * 1.05;
 		metal = win * 0.5;
 		rough = mix(0.8, 0.12, win);
 	} else if (st == 1) {
@@ -165,11 +180,11 @@ void fragment() {
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.3, f.x) * step(f.x, 0.7) * step(0.18, f.y) * step(f.y, 0.82) * step(4.8, v);
-		float on = step(0.52, hash(id + seed * 113.0));
+		float on = step(0.68, hash(id + seed * 113.0));
 		float band = step(fract(v / 21.0), 0.035);
 		vec3 stone = wall * (1.0 - 0.18 * band - 0.1 * step(f.x, 0.08));
 		alb = mix(stone, vec3(0.05, 0.06, 0.09), win);
-		emi = warm * win * on * 1.7;
+		emi = lightc(id, bias) * win * on * 1.2;
 		rough = mix(0.85, 0.2, win);
 	} else if (st == 2) {
 		// Brick: courses of bricks, punched windows with sills.
@@ -180,20 +195,20 @@ void fragment() {
 		vec2 f = fract(cell);
 		float win = step(0.28, f.x) * step(f.x, 0.72) * step(0.22, f.y) * step(f.y, 0.78) * step(3.2, v);
 		float sill = step(0.18, f.y) * step(f.y, 0.22) * step(0.26, f.x) * step(f.x, 0.74) * step(3.2, v);
-		float on = step(0.55, hash(id + seed * 113.0));
+		float on = step(0.65, hash(id + seed * 113.0));
 		vec3 b = wall * (1.0 - 0.28 * min(brick, 1.0)) * (0.9 + 0.2 * hash(vec2(row, floor(u / 0.56))));
 		alb = mix(b, vec3(0.05, 0.06, 0.09), win);
 		alb = mix(alb, vec3(0.7, 0.66, 0.6), sill);
-		emi = warm * win * on * 1.6;
+		emi = lightc(id, bias) * win * on * 1.15;
 	} else if (st == 3) {
 		// Concrete slab: long ribbon windows.
 		vec2 cell = vec2(u / 4.0, v / 3.6);
 		vec2 id = floor(cell);
 		vec2 f = fract(cell);
 		float win = step(0.3, f.y) * step(f.y, 0.72) * step(0.04, f.x) * step(4.0, v);
-		float on = step(0.5, hash(id + seed * 113.0));
+		float on = step(0.68, hash(id + seed * 113.0));
 		alb = mix(wall * (0.92 + 0.12 * hash(floor(vec2(u, v) / 3.0))), vec3(0.05, 0.07, 0.1), win);
-		emi = mix(warm, cool, step(0.8, hash(id * 1.7))) * win * on * 1.5;
+		emi = lightc(id, bias) * win * on * 1.1;
 	} else if (st == 4) {
 		// Industrial: corrugated cladding, high strip windows, grime near the ground.
 		float rib = 0.86 + 0.14 * sin(u * 9.0);
@@ -212,7 +227,7 @@ void fragment() {
 		float shutter = step(0.16, f.x) * step(f.x, 0.84) * step(0.28, f.y) * step(f.y, 0.74) * (1.0 - win);
 		alb = mix(wall, vec3(0.06, 0.07, 0.1), win);
 		alb = mix(alb, wall * 0.55, shutter * step(0.5, abs(f.x - 0.5) * 2.0 + 0.3));
-		emi = warm * win * step(0.55, hash(id + seed * 113.0)) * 1.4;
+		emi = lightc(id, bias) * win * step(0.55, hash(id + seed * 113.0)) * 1.4;
 	} else if (st == 9) {
 		// Civic limestone: tall window slots and heavy cornices.
 		vec2 cell = vec2(u / 5.4, v / 5.2);
@@ -222,7 +237,7 @@ void fragment() {
 		float cornice = step(fract(v / 20.8), 0.05);
 		vec3 stone = wall * (1.0 - 0.2 * cornice) * (0.94 + 0.12 * hash(floor(vec2(u, v) / 2.5)));
 		alb = mix(stone, vec3(0.06, 0.07, 0.1), win);
-		emi = warm * win * step(0.4, hash(id + seed * 113.0)) * 1.8;
+		emi = lightc(id, bias) * win * step(0.4, hash(id + seed * 113.0)) * 1.8;
 		rough = mix(0.9, 0.2, win);
 	} else if (st == 10) {
 		// Painted metal: cranes, tanks, chimneys.
@@ -238,6 +253,25 @@ void fragment() {
 		rough = 0.6;
 	}
 
+	if (!top_face && (st == 0 || st == 1 || st == 2 || st == 3 || st == 9)) {
+		// Weathering: grime near the street, rain streaks, a lighter parapet under the roof edge.
+		float streak = hash(vec2(floor(u * 1.7), seed * 31.0));
+		float dirt = mix(0.6, 1.0, smoothstep(0.0, 16.0, gy));
+		float rain = 1.0 - 0.18 * step(0.55, streak) * (1.0 - clamp(v / max(part_h, 1.0), 0.0, 1.0));
+		alb *= dirt * rain;
+		alb = mix(alb, wall * 1.2, 0.55 * step(part_h - 1.4, v));
+		// Ground-floor shops: lit glass, a coloured striped awning above.
+		if (gy < 5.4) {
+			float sf = fract(u / 6.0);
+			float shop = step(0.8, gy) * step(gy, 4.1) * step(0.06, sf) * step(sf, 0.94);
+			float awn = step(4.1, gy) * step(gy, 5.1);
+			vec3 awn_c = mix(accent, accent * 0.5, step(0.5, fract(u / 1.3)));
+			alb = mix(alb, vec3(0.05, 0.06, 0.08), shop);
+			emi = mix(emi, lightc(vec2(floor(u / 6.0), 5.0), bias) * 1.2, shop);
+			alb = mix(alb, awn_c, awn);
+			emi = mix(emi, vec3(0.0), awn);
+		}
+	}
 	if (burnt > 1.5) {
 		// The hole: charred black with glowing embers in the cracks.
 		float ember = step(0.62, hash(floor(world_pos.xz * 0.9) + floor(world_pos.y * 0.9) * 7.0));
@@ -253,7 +287,7 @@ void fragment() {
 		emi = emi * step(0.75, hash(floor(vec2(u, v) / 3.0) + seed)) * vec3(1.0, 0.45, 0.12) * flicker;
 		metal = 0.0;
 	}
-	ALBEDO = alb * (1.0 - dent * 0.6);
+	ALBEDO = alb * (1.0 - dent * 0.6) * (top_face || st == 7 || st == 8 ? 1.0 : 1.18);
 	EMISSION = emi;
 	ROUGHNESS = rough;
 	METALLIC = metal;

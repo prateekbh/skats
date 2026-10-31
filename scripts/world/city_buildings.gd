@@ -26,12 +26,16 @@ const DMG_BOX_MAX := 320
 const DMG_CYL_MAX := 48
 const RUBBLE_MAX := 400
 
-const GLASS_COLS := [Color(0.18, 0.34, 0.55), Color(0.12, 0.4, 0.5), Color(0.2, 0.25, 0.45), Color(0.3, 0.42, 0.52), Color(0.15, 0.2, 0.3), Color(0.25, 0.5, 0.55)]
-const STONE_COLS := [Color(0.66, 0.58, 0.45), Color(0.58, 0.52, 0.42), Color(0.7, 0.64, 0.52), Color(0.5, 0.46, 0.4), Color(0.62, 0.5, 0.4)]
-const BRICK_COLS := [Color(0.55, 0.27, 0.2), Color(0.5, 0.32, 0.24), Color(0.42, 0.24, 0.2), Color(0.6, 0.4, 0.3)]
-const PASTEL := [Color(0.9, 0.82, 0.65), Color(0.85, 0.62, 0.55), Color(0.62, 0.78, 0.85), Color(0.7, 0.82, 0.65), Color(0.9, 0.75, 0.8), Color(0.88, 0.88, 0.8)]
-const ROOF_COLS := [Color(0.6, 0.28, 0.2), Color(0.32, 0.34, 0.4), Color(0.45, 0.3, 0.25), Color(0.25, 0.3, 0.28)]
-const INDUSTRIAL_COLS := [Color(0.55, 0.3, 0.2), Color(0.38, 0.42, 0.5), Color(0.3, 0.45, 0.4), Color(0.5, 0.48, 0.42)]
+const GLASS_COLS := [Color(0.18, 0.34, 0.55), Color(0.12, 0.4, 0.5), Color(0.2, 0.25, 0.45), Color(0.3, 0.42, 0.52), Color(0.15, 0.2, 0.3), Color(0.25, 0.5, 0.55),
+	Color(0.52, 0.4, 0.22), Color(0.58, 0.48, 0.22), Color(0.18, 0.42, 0.3), Color(0.62, 0.66, 0.7), Color(0.25, 0.27, 0.3), Color(0.5, 0.3, 0.36)]
+const STONE_COLS := [Color(0.8, 0.74, 0.6), Color(0.7, 0.6, 0.42), Color(0.7, 0.5, 0.45), Color(0.5, 0.5, 0.52), Color(0.45, 0.3, 0.22), Color(0.88, 0.84, 0.7),
+	Color(0.65, 0.33, 0.25), Color(0.72, 0.45, 0.3), Color(0.3, 0.3, 0.34), Color(0.58, 0.54, 0.46)]
+const BRICK_COLS := [Color(0.6, 0.25, 0.18), Color(0.4, 0.25, 0.18), Color(0.7, 0.58, 0.32), Color(0.4, 0.15, 0.13), Color(0.72, 0.4, 0.22), Color(0.45, 0.45, 0.47), Color(0.55, 0.32, 0.26)]
+const CONCRETE_COLS := [Color(0.82, 0.8, 0.74), Color(0.6, 0.68, 0.75), Color(0.7, 0.64, 0.52), Color(0.5, 0.5, 0.52), Color(0.32, 0.33, 0.36), Color(0.66, 0.66, 0.68), Color(0.74, 0.7, 0.62)]
+const PASTEL := [Color(0.9, 0.82, 0.65), Color(0.85, 0.62, 0.55), Color(0.62, 0.78, 0.85), Color(0.7, 0.82, 0.65), Color(0.9, 0.75, 0.8), Color(0.88, 0.88, 0.8),
+	Color(0.95, 0.95, 0.92), Color(0.9, 0.78, 0.4), Color(0.45, 0.6, 0.78), Color(0.58, 0.68, 0.5), Color(0.75, 0.42, 0.32), Color(0.62, 0.6, 0.6)]
+const ROOF_COLS := [Color(0.6, 0.28, 0.2), Color(0.32, 0.34, 0.4), Color(0.45, 0.3, 0.25), Color(0.25, 0.3, 0.28), Color(0.2, 0.2, 0.22), Color(0.5, 0.2, 0.16)]
+const INDUSTRIAL_COLS := [Color(0.55, 0.3, 0.2), Color(0.38, 0.42, 0.5), Color(0.3, 0.45, 0.4), Color(0.5, 0.48, 0.42), Color(0.7, 0.68, 0.62), Color(0.25, 0.3, 0.4), Color(0.6, 0.5, 0.25)]
 const CONTAINER_COLS := [Color(0.8, 0.2, 0.15), Color(0.15, 0.4, 0.7), Color(0.9, 0.7, 0.15), Color(0.2, 0.55, 0.3), Color(0.85, 0.85, 0.8), Color(0.5, 0.25, 0.15)]
 const NEON_COLS := [Color(1.0, 0.2, 0.5), Color(0.2, 0.9, 1.0), Color(1.0, 0.85, 0.2), Color(1.0, 0.3, 0.2), Color(0.5, 1.0, 0.4)]
 
@@ -161,6 +165,12 @@ func _rect_ok(kid: int, cx: float, cz: float, hw: float, hd: float, margin: floa
 	return true
 
 
+## A palette colour with a little hue, saturation and value jitter, so no two buildings match.
+func _c(arr: Array) -> Color:
+	var c: Color = arr[rng.randi() % arr.size()]
+	return Color.from_hsv(fposmod(c.h + rng.randf_range(-0.02, 0.02), 1.0), clampf(c.s * rng.randf_range(0.85, 1.15), 0.0, 1.0), clampf(c.v * rng.randf_range(0.88, 1.1), 0.0, 1.0))
+
+
 func _pick(mix: Dictionary) -> String:
 	var total := 0.0
 	for k in mix:
@@ -175,8 +185,10 @@ func _pick(mix: Dictionary) -> String:
 
 func _lot_color(kname: String) -> Color:
 	match kname:
-		"residential", "suburb":
-			return Color(0.28, 0.46, 0.2).lerp(Color(0.34, 0.5, 0.24), rng.randf())
+		"suburb":
+			return Color(0.27, 0.45, 0.2).lerp(Color(0.31, 0.49, 0.22), rng.randf()) # the same grass as the ground
+		"residential":
+			return Color(0.27, 0.45, 0.2).lerp(Color(0.31, 0.49, 0.22), rng.randf())
 		"industrial":
 			return Color(0.3, 0.3, 0.29)
 		"salvage":
@@ -408,7 +420,7 @@ func _roof_extras(id: int, cx: float, cz: float, w: float, d: float, topy: float
 
 func _glass(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var col: Color = GLASS_COLS[rng.randi() % GLASS_COLS.size()]
+	var col: Color = _c(GLASS_COLS)
 	part(id, M.BOX, cx, G, cz, w, h, d, S.GLASS, col)
 	var topy := G + h
 	if h > 110.0:
@@ -420,7 +432,7 @@ func _glass(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> voi
 
 func _deco(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var col: Color = STONE_COLS[rng.randi() % STONE_COLS.size()]
+	var col: Color = _c(STONE_COLS)
 	part(id, M.BOX, cx, G, cz, w, h * 0.5, d, S.DECO, col)
 	part(id, M.BOX, cx, G + h * 0.5, cz, w * 0.78, h * 0.3, d * 0.78, S.DECO, col)
 	var tier := part(id, M.BOX, cx, G + h * 0.8, cz, w * 0.52, h * 0.2, d * 0.52, S.DECO, col.lightened(0.05))
@@ -433,13 +445,13 @@ func _deco(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void
 func _podium(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
 	var hp := rng.randf_range(22.0, 44.0)
-	var stone: Color = STONE_COLS[rng.randi() % STONE_COLS.size()]
+	var stone: Color = _c(STONE_COLS)
 	part(id, M.BOX, cx, G, cz, w, hp, d, S.CONCRETE if rng.randf() < 0.5 else S.DECO, stone)
 	var tw := w * rng.randf_range(0.5, 0.62)
 	var td := d * rng.randf_range(0.5, 0.62)
 	var tx := cx + rng.randf_range(-0.15, 0.15) * w
 	var tz := cz + rng.randf_range(-0.15, 0.15) * d
-	var col: Color = GLASS_COLS[rng.randi() % GLASS_COLS.size()]
+	var col: Color = _c(GLASS_COLS)
 	var tier := part(id, M.BOX, tx, G + hp, tz, tw, maxf(h - hp, 30.0), td, S.GLASS, col)
 	_roof_extras(id, tx, tz, tw, td, G + maxf(h, hp + 30.0), h, kid)
 	end(id)
@@ -448,7 +460,7 @@ func _podium(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> vo
 
 func _twin(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var col: Color = GLASS_COLS[rng.randi() % GLASS_COLS.size()]
+	var col: Color = _c(GLASS_COLS)
 	var tw := w * 0.36
 	part(id, M.BOX, cx - w * 0.3, G, cz, tw, h, d * 0.7, S.GLASS, col)
 	part(id, M.BOX, cx + w * 0.3, G, cz, tw, h * 0.9, d * 0.7, S.GLASS, col.lightened(0.05))
@@ -460,7 +472,7 @@ func _twin(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void
 func _round(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
 	var r := minf(w, d) * 0.42
-	var col: Color = GLASS_COLS[rng.randi() % GLASS_COLS.size()]
+	var col: Color = _c(GLASS_COLS)
 	part(id, M.CYL, cx, G, cz, r * 2.0, h, r * 2.0, S.GLASS, col, true)
 	part(id, M.CYL, cx, G + h, cz, r * 1.7, 6.0, r * 1.7, S.METAL, col.lightened(0.15), false)
 	_roof_extras(id, cx, cz, r, r, G + h + 6.0, h, kid)
@@ -469,15 +481,14 @@ func _round(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> voi
 
 func _slab(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var greys := [Color(0.62, 0.62, 0.64), Color(0.7, 0.68, 0.64), Color(0.55, 0.58, 0.62)]
-	part(id, M.BOX, cx, G, cz, w, h, d, S.CONCRETE, greys[rng.randi() % greys.size()])
+	part(id, M.BOX, cx, G, cz, w, h, d, S.CONCRETE, _c(CONCRETE_COLS))
 	_roof_extras(id, cx, cz, w, d, G + h, h, kid)
 	end(id)
 
 
 func _civic(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var col: Color = STONE_COLS[rng.randi() % STONE_COLS.size()].lightened(0.1)
+	var col: Color = _c(STONE_COLS).lightened(0.1)
 	part(id, M.BOX, cx, G, cz, w, h * 0.65, d, S.CIVIC, col)
 	var tier := part(id, M.BOX, cx, G + h * 0.65, cz, w * 0.7, h * 0.35, d * 0.7, S.CIVIC, col)
 	part(id, M.CONE, cx, G + h, cz, w * 0.6, h * 0.25, d * 0.6, S.ROOF, Color(0.3, 0.45, 0.4), false, 0.0, false)
@@ -487,7 +498,7 @@ func _civic(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> voi
 
 func _tenement(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var col: Color = BRICK_COLS[rng.randi() % BRICK_COLS.size()]
+	var col: Color = _c(BRICK_COLS)
 	var bw := w * rng.randf_range(0.6, 0.85)
 	var bd := d * rng.randf_range(0.6, 0.85)
 	part(id, M.BOX, cx, G, cz, bw, h, bd, S.BRICK, col)
@@ -505,7 +516,7 @@ func _gable(id: int, cx: float, cz: float, w: float, d: float, y0: float, rh: fl
 
 func _warehouse(cx: float, cz: float, w: float, d: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var col: Color = INDUSTRIAL_COLS[rng.randi() % INDUSTRIAL_COLS.size()]
+	var col: Color = _c(INDUSTRIAL_COLS)
 	var hh := rng.randf_range(10.0, 20.0)
 	part(id, M.BOX, cx, G, cz, w, hh, d, S.INDUSTRIAL, col)
 	_gable(id, cx, cz, w, d, G + hh, rng.randf_range(4.0, 7.0), col.darkened(0.25))
@@ -514,7 +525,7 @@ func _warehouse(cx: float, cz: float, w: float, d: float, kid: int) -> void:
 
 func _factory(cx: float, cz: float, w: float, d: float, h: float, kid: int) -> void:
 	var id := begin(cx, cz, kid)
-	var brick: Color = BRICK_COLS[rng.randi() % BRICK_COLS.size()]
+	var brick: Color = _c(BRICK_COLS)
 	part(id, M.BOX, cx, G, cz, w * 0.7, h * 0.6, d * 0.7, S.BRICK, brick)
 	part(id, M.BOX, cx + w * 0.15, G, cz - d * 0.1, w * 0.35, h, d * 0.4, S.INDUSTRIAL, Color(0.45, 0.45, 0.48))
 	for n in rng.randi_range(1, 3):
@@ -553,13 +564,15 @@ func _houses(cx: float, cz: float, w: float, d: float, kid: int) -> void:
 			var hd := minf(d / nz - 7.0, rng.randf_range(10.0, 16.0))
 			var hh := rng.randf_range(5.5, 9.0) if rng.randf() < 0.6 else rng.randf_range(9.0, 13.5) # some two-and-a-half storeys
 			var id := begin(px, pz, kid)
-			part(id, M.BOX, px, G, pz, hw, hh, hd, S.HOUSE, PASTEL[rng.randi() % PASTEL.size()])
-			_gable(id, px, pz, hw, hd, G + hh, rng.randf_range(2.5, 4.5), ROOF_COLS[rng.randi() % ROOF_COLS.size()])
+			part(id, M.BOX, px, G, pz, hw, hh, hd, S.HOUSE, _c(PASTEL))
+			_gable(id, px, pz, hw, hd, G + hh, rng.randf_range(2.5, 4.5), _c(ROOF_COLS))
 			if rng.randf() < 0.3:
 				part(id, M.BOX, px + hw * 0.25, G + hh, pz, 1.6, 5.0, 1.6, S.BRICK, Color(0.5, 0.3, 0.25), false, 0.0, false)
 			end(id)
-			if rng.randf() < 0.55:
-				_tree(Vector3(px + hw * 0.5 + 5.0, G, pz + hd * 0.5 + 4.0), rng.randf_range(0.8, 1.2))
+			if rng.randf() < (0.8 if kid == CityPlan.K.SUBURB else 0.55):
+				_tree(Vector3(px + hw * 0.5 + 5.0, G, pz + hd * 0.5 + 4.0), rng.randf_range(0.8, 1.3))
+			if kid == CityPlan.K.SUBURB and rng.randf() < 0.4:
+				_tree(Vector3(px - hw * 0.5 - 4.0, G, pz - hd * 0.5 - 3.0), rng.randf_range(0.8, 1.2))
 	if rng.randf() < 0.2 and nx % 2 == 0 and nz % 2 == 0:
 		_cache_spot("residential", Vector3(cx, G, cz)) # the block centre is free only between plots
 
