@@ -72,12 +72,19 @@ func _node(pos: Vector3, name: String) -> Node3D:
 func _tower(at: Vector3) -> void:
 	var root := _node(at, "MegaKatTower")
 	var glass := _wall(S.GLASS, Color(0.1, 0.2, 0.5), 1050.0)
+	var stone_band := MeshKit.toon(Color(0.86, 0.84, 0.78), 0.2, 0.7)
 	var sections := [[120.0, 102.0, 0.0, 420.0], [102.0, 82.0, 420.0, 840.0], [82.0, 62.0, 840.0, 1050.0]]
 	for s in sections:
 		var h: float = s[3] - s[2]
 		_frustum(root, s[0], s[1], h, Vector3(0, G + s[2] + h * 0.5, 0), glass)
 		_box(root, Vector3(s[1] * 1.07, 7.0, s[1] * 1.07), Vector3(0, G + s[3], 0), gold)
 		b.add_fixed(at.x, at.z, s[0], s[0], G + s[3])
+		# Pale stone bands every 70 m, like storeys of a 300-floor tower.
+		var y: float = s[2] + 70.0
+		while y < s[3] - 10.0:
+			var wd: float = lerpf(s[0], s[1], (y - s[2]) / h) + 3.0
+			_box(root, Vector3(wd, 2.5, wd), Vector3(0, G + y, 0), stone_band)
+			y += 70.0
 	# The crown: a gold frustum with four fins around a tall spire.
 	_frustum(root, 62.0, 30.0, 80.0, Vector3(0, G + 1090.0, 0), gold)
 	for sx: float in [-1.0, 1.0]:

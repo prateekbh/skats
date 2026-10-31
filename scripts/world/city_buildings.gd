@@ -252,6 +252,8 @@ func _district(kname: String, kid: int, p: Dictionary) -> void:
 				continue
 			if rng.randf() < float(p.get("plaza", 0.0)):
 				_pad(cx, cz, hw, hd, Color(0.58, 0.54, 0.46) if kname != "salvage" else Color(0.3, 0.24, 0.17))
+				if kname != "salvage":
+					_plaza_trees(cx, cz, hw, hd)
 				_cache_spot(kname, Vector3(cx, G, cz))
 				continue
 			var infl := 0.0
@@ -271,6 +273,12 @@ func _district(kname: String, kid: int, p: Dictionary) -> void:
 			var bz := cz + rng.randf_range(-1.0, 1.0) * slack_z * 0.3
 			_cell_building(arch, kname, kid, bx, bz, bw, bd, h)
 			counts[kname] = int(counts[kname]) + 1
+
+
+## Trees and a lawn strip on an open plaza.
+func _plaza_trees(cx: float, cz: float, hw: float, hd: float) -> void:
+	for k in rng.randi_range(6, 12):
+		_tree(Vector3(cx + rng.randf_range(-0.85, 0.85) * hw, G, cz + rng.randf_range(-0.85, 0.85) * hd), rng.randf_range(1.2, 2.0))
 
 
 func _cell_building(arch: String, kname: String, kid: int, cx: float, cz: float, w: float, d: float, h: float) -> void:

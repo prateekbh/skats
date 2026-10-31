@@ -359,6 +359,10 @@ void fragment() {
 		metal = 0.3;
 		rough = 0.6;
 	}
+	// Sun side warm, shade side cool (the sun sits low in the west).
+	vec3 wn = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	float facing = dot(wn, normalize(vec3(-0.837, 0.5, -0.224)));
+	alb *= mix(vec3(0.8, 0.88, 1.08), vec3(1.12, 1.02, 0.88), clamp(facing * 0.6 + 0.5, 0.0, 1.0));
 	ALBEDO = alb * (1.0 - dent * 0.6) * (top_face || st == 7 || st == 8 ? 1.0 : 1.18);
 	EMISSION = emi * 0.5; // daylight: lit windows are a glint, not a glow
 	ROUGHNESS = rough;
