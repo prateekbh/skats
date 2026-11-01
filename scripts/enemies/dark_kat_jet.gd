@@ -79,33 +79,50 @@ func _build() -> void:
 	var white := MeshKit.toon(Color(0.95, 0.95, 1.0), 0.1, 0.5)
 	var flame := MeshKit.glow(Color(0.55, 0.8, 1.0, 0.85), true)
 	var core := MeshKit.glow(Color(0.95, 0.98, 1.0, 0.9), true)
-	# Fuselage: a long rounded body with a pointed nose.
-	MeshKit.part(_model, MeshKit.sphere(1.0, 20), lilac, Vector3(0, 0, 1.5), Vector3.ZERO, Vector3(2.7, 1.9, 8.5))
-	MeshKit.part(_model, MeshKit.cyl(0.0, 1.95, 9.0, 8), lilac, Vector3(0, -0.05, -8.2), Vector3(-PI / 2, 0, 0))
-	# Dark canopy and cheek panels on the nose.
-	MeshKit.part(_model, MeshKit.slab(PackedVector2Array([Vector2(0, -11.0), Vector2(1.5, -4.0), Vector2(-1.5, -4.0)]), 0.3), dark, Vector3(0, 1.55, 0))
+	var belly := MeshKit.toon(Color(0.46, 0.4, 0.36), 0.2, 0.6)
+	var eye := MeshKit.glow(Color(0.8, 0.95, 0.2))
+	var canopy := MeshKit.toon(Color(0.72, 0.66, 0.9), 0.4, 0.3)
+	var hook := Vector3(-2.5, 0, 0) # the nose points down and forward (top of the cylinder = the tip)
+	# Fuselage and a bulbous skull-like head.
+	MeshKit.part(_model, MeshKit.sphere(1.0, 20), red, Vector3(0, 0, 2.0), Vector3.ZERO, Vector3(2.8, 2.0, 9.0))
+	MeshKit.part(_model, MeshKit.sphere(1.0, 20), red, Vector3(0, 0.2, -6.0), Vector3.ZERO, Vector3(3.1, 2.7, 4.6))
+	# The iconic bent nose: a beak hooking down, with black slits on both sides.
+	MeshKit.part(_model, MeshKit.cyl(0.25, 2.5, 6.5, 12), red, Vector3(0, -2.0, -9.6), hook)
 	for sx in [-1.0, 1.0]:
-		MeshKit.part(_model, MeshKit.slab(PackedVector2Array([Vector2(0, -8.5), Vector2(1.0 * sx, -2.0), Vector2(2.2 * sx, -2.6)]), 0.25), dark, Vector3(0, 0.3, 0), Vector3(0, 0, 0.0))
-	# Swept wings, tips cut square, as in the show.
-	var wing_r := PackedVector2Array([Vector2(1.8, -3.5), Vector2(12.8, 4.5), Vector2(12.8, 8.0), Vector2(2.2, 5.5)])
-	var wing_l := PackedVector2Array([Vector2(-2.2, 5.5), Vector2(-12.8, 8.0), Vector2(-12.8, 4.5), Vector2(-1.8, -3.5)])
-	MeshKit.part(_model, MeshKit.slab(wing_r, 0.4), lilac, Vector3(0, -0.2, 0))
-	MeshKit.part(_model, MeshKit.slab(wing_l, 0.4), lilac, Vector3(0, -0.2, 0))
-	# Twin red engine pods with white intakes and blue-white afterburners.
+		MeshKit.part(_model, MeshKit.box(Vector3(0.3, 3.0, 0.9)), dark, Vector3(1.42 * sx, -1.7, -9.1), hook + Vector3(0, 0.18 * sx, 0))
+		MeshKit.part(_model, MeshKit.box(Vector3(0.28, 1.6, 0.7)), dark, Vector3(0.85 * sx, -2.7, -10.5), hook + Vector3(0, 0.1 * sx, 0))
+		# Slanted green-yellow eyes and the thin red horns sticking out of the head.
+		MeshKit.part(_model, MeshKit.box(Vector3(0.2, 0.55, 1.6)), eye, Vector3(2.55 * sx, 0.1, -7.2), Vector3(0, 0, 0.5 * sx))
+		var horn := PackedVector2Array([Vector2(0, -5.0), Vector2(5.6 * sx, -11.5), Vector2(1.0 * sx, -4.0)])
+		MeshKit.part(_model, MeshKit.slab(horn, 0.22), red, Vector3(2.0 * sx, 0.9, 0))
+	MeshKit.part(_model, MeshKit.box(Vector3(2.2, 0.3, 1.8)), canopy, Vector3(0, 2.15, -6.6), Vector3(0.28, 0, 0))
+	# Grey-brown ribbed belly and the two lilac intakes beneath.
+	MeshKit.part(_model, MeshKit.sphere(1.0, 14), belly, Vector3(0, -1.55, 0.5), Vector3.ZERO, Vector3(2.5, 1.3, 8.0))
+	for k in 5:
+		MeshKit.part(_model, MeshKit.box(Vector3(4.2, 0.12, 0.25)), dark, Vector3(0, -2.2, -3.0 + k * 1.7))
 	for sx in [-1.0, 1.0]:
-		var x: float = 4.8 * sx
-		MeshKit.part(_model, MeshKit.box(Vector3(3.0, 0.9, 6.0)), lilac, Vector3(x * 0.6, -0.2, 2.5))
-		MeshKit.part(_model, MeshKit.cyl(1.35, 1.35, 10.0, 14), red, Vector3(x, -0.3, 3.0), Vector3(PI / 2, 0, 0))
-		MeshKit.part(_model, MeshKit.cyl(1.5, 1.5, 0.7, 14), white, Vector3(x, -0.3, -2.1), Vector3(PI / 2, 0, 0))
-		MeshKit.part(_model, MeshKit.cyl(1.05, 1.05, 0.2, 14), dark, Vector3(x, -0.3, -2.5), Vector3(PI / 2, 0, 0))
-		MeshKit.part(_model, MeshKit.cyl(1.0, 1.35, 1.4, 14), dark, Vector3(x, -0.3, 8.4), Vector3(PI / 2, 0, 0))
-		MeshKit.part(_model, MeshKit.cyl(0.0, 1.0, 8.0, 10), flame, Vector3(x, -0.3, 13.0), Vector3(PI / 2, 0, 0))
-		MeshKit.part(_model, MeshKit.cyl(0.0, 0.5, 4.0, 8), core, Vector3(x, -0.3, 11.0), Vector3(PI / 2, 0, 0))
-		# Dark vertical tail fin and a small red flap.
-		var fin := PackedVector2Array([Vector2(0, 0), Vector2(4.0, 4.4), Vector2(4.0, 7.6), Vector2(0, 6.4)])
-		MeshKit.part(_model, MeshKit.slab(fin, 0.3), grey, Vector3(2.0 * sx, 1.1, 2.0), Vector3(0, 0, PI / 2 + (0.0 if sx > 0.0 else 0.0)))
-		var flap := PackedVector2Array([Vector2(0, 0), Vector2(3.8 * sx, 0.6), Vector2(3.8 * sx, 2.4), Vector2(0, 1.8)])
-		MeshKit.part(_model, MeshKit.slab(flap, 0.3), red, Vector3(x + 1.2 * sx, -0.1, 7.0))
+		MeshKit.part(_model, MeshKit.cyl(1.05, 1.05, 6.5, 12), canopy, Vector3(1.9 * sx, -0.5, 4.2), Vector3(PI / 2, 0, 0))
+		MeshKit.part(_model, MeshKit.cyl(1.1, 1.1, 0.6, 12), white, Vector3(1.9 * sx, -0.5, 0.9), Vector3(PI / 2, 0, 0))
+		MeshKit.part(_model, MeshKit.cyl(0.0, 0.9, 7.0, 10), flame, Vector3(1.9 * sx, -0.5, 11.6), Vector3(PI / 2, 0, 0))
+		MeshKit.part(_model, MeshKit.cyl(0.0, 0.45, 3.5, 8), core, Vector3(1.9 * sx, -0.5, 9.8), Vector3(PI / 2, 0, 0))
+	# Four black spikes raked back along the spine, with black stripes between them.
+	var spikes := [[-3.0, 6.0], [-0.2, 8.0], [2.4, 6.5], [4.8, 4.2]]
+	for sp in spikes:
+		var h: float = sp[1]
+		MeshKit.part(_model, MeshKit.cyl(0.0, 0.95, h, 8), dark, Vector3(0, 1.6 + h * 0.46, sp[0] + h * 0.12), Vector3(0.5, 0, 0))
+	for k in 4:
+		MeshKit.part(_model, MeshKit.box(Vector3(2.9, 0.3, 0.7)), dark, Vector3(0, 1.88, -1.6 + k * 2.4))
+	# Swept red wings, a tall tail fin and small tail planes.
+	var wing_r := PackedVector2Array([Vector2(1.6, 0.0), Vector2(13.0, 9.2), Vector2(13.0, 11.6), Vector2(2.2, 7.8)])
+	var wing_l := PackedVector2Array([Vector2(-2.2, 7.8), Vector2(-13.0, 11.6), Vector2(-13.0, 9.2), Vector2(-1.6, 0.0)])
+	MeshKit.part(_model, MeshKit.slab(wing_r, 0.4), red, Vector3(0, -0.4, 0))
+	MeshKit.part(_model, MeshKit.slab(wing_l, 0.4), red, Vector3(0, -0.4, 0))
+	var fin := PackedVector2Array([Vector2(0, 0), Vector2(4.2, 3.0), Vector2(4.2, 5.8), Vector2(0, 6.4)])
+	MeshKit.part(_model, MeshKit.slab(fin, 0.35), red, Vector3(0, 1.4, 4.6), Vector3(0, 0, PI / 2))
+	var tail_r := PackedVector2Array([Vector2(0, 7.5), Vector2(5.5, 10.0), Vector2(5.5, 11.2), Vector2(0, 11.0)])
+	var tail_l := PackedVector2Array([Vector2(0, 11.0), Vector2(-5.5, 11.2), Vector2(-5.5, 10.0), Vector2(0, 7.5)])
+	MeshKit.part(_model, MeshKit.slab(tail_r, 0.3), red, Vector3(0, 0.2, 0))
+	MeshKit.part(_model, MeshKit.slab(tail_l, 0.3), red, Vector3(0, 0.2, 0))
 	_shield_mat = ShaderMaterial.new()
 	_shield_mat.shader = load("res://shaders/shield.gdshader")
 	_shield = MeshInstance3D.new()
