@@ -96,9 +96,11 @@ func _build() -> void:
 	MeshKit.part(_model, plate_mesh, red).transform = Transform3D(seg_a.basis * Basis.from_scale(Vector3(1, 1, 0.65)), seg_a.origin)
 	var seg_b := Transform3D(seg_a.basis * Basis.from_euler(Vector3(-0.7, 0, 0)), seg_a * Vector3(0, -0.1, -3.0))
 	MeshKit.part(_model, tip_mesh, red).transform = Transform3D(seg_b.basis * Basis.from_scale(Vector3(1.05, 1, 0.8)), seg_b.origin)
-	for x in [-1.05, 0.0, 1.05]:
-		var slit := MeshKit.part(_model, MeshKit.box(Vector3(0.5, 0.05, 2.9)), dark)
-		slit.transform = Transform3D(seg_b.basis * Basis.from_euler(Vector3(0, 0.26 * signf(x), 0)), seg_b * Vector3(x * 0.8, 0.47, -1.9))
+	# The slits run the whole length of the tip plate (it is 0.8 x 4.6 = 3.7 m long).
+	for x in [-1.0, 0.0, 1.0]:
+		var side := signf(x)
+		var slit := MeshKit.part(_model, MeshKit.box(Vector3(0.42, 0.05, 3.5 if side != 0.0 else 3.62)), dark)
+		slit.transform = Transform3D(seg_b.basis * Basis.from_euler(Vector3(0, 0.23 * side, 0)), seg_b * Vector3(0.6 * x, 0.47, -1.9))
 	for sx in [-1.0, 1.0]:
 		# Slanted green-yellow eyes and the thin red horns sticking out of the head.
 		MeshKit.part(_model, MeshKit.box(Vector3(0.2, 0.55, 1.6)), eye, Vector3(2.55 * sx, 0.1, -7.2), Vector3(0, 0, 0.5 * sx))
