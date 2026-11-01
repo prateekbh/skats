@@ -89,8 +89,13 @@ func _build() -> void:
 	# The iconic bent nose: a beak hooking down, with black slits on both sides.
 	MeshKit.part(_model, MeshKit.cyl(0.25, 2.5, 6.5, 12), red, Vector3(0, -2.0, -9.6), hook)
 	for sx in [-1.0, 1.0]:
-		MeshKit.part(_model, MeshKit.box(Vector3(0.3, 3.0, 0.9)), dark, Vector3(1.42 * sx, -1.7, -9.1), hook + Vector3(0, 0.18 * sx, 0))
-		MeshKit.part(_model, MeshKit.box(Vector3(0.28, 1.6, 0.7)), dark, Vector3(0.85 * sx, -2.7, -10.5), hook + Vector3(0, 0.1 * sx, 0))
+		# Black slits painted flat on the beak (thin decals lying on the cone's surface).
+		for sl in [[0.7, 3.0, 0.9], [-1.9, 1.7, 0.7]]: # centre along the beak, length, width
+			var t: float = (sl[0] + 3.25) / 6.5
+			var rr: float = 2.5 - 2.25 * t + 0.03
+			var mi := MeshKit.part(_model, MeshKit.box(Vector3(0.05, sl[1], sl[2])), dark)
+			mi.transform = Transform3D(Basis.from_euler(hook) * Basis.from_euler(Vector3(0, 0, 0.33 * sx)),
+				Vector3(0, -2.0, -9.6) + Basis.from_euler(hook) * Vector3(sx * rr, sl[0], 0))
 		# Slanted green-yellow eyes and the thin red horns sticking out of the head.
 		MeshKit.part(_model, MeshKit.box(Vector3(0.2, 0.55, 1.6)), eye, Vector3(2.55 * sx, 0.1, -7.2), Vector3(0, 0, 0.5 * sx))
 		var horn := PackedVector2Array([Vector2(0, -5.0), Vector2(5.6 * sx, -11.5), Vector2(1.0 * sx, -4.0)])
