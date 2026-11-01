@@ -5,52 +5,31 @@ extends Node
 const SAVE_PATH := "user://megakat_skies.cfg"
 const SETTINGS_VERSION := 2
 
-const EPISODES: Array[Dictionary] = [
-	{
-		"id": "ep01",
-		"number": "Episode 1",
-		"title": "Dark Skies Over Megakat",
-		"villain": "Dark Kat",
-		"script": "res://scripts/missions/ep01_dark_skies.gd",
-		"playable": true,
-		"story": "Dusk over Megakat City. Dark Kat has unleashed a swarm of Creepling gliders on downtown, and the Enforcers are getting shredded. Callie Briggs has hit the emergency line to the salvage yard.\n\nRazor and T-Bone scramble the TurboKat.",
-		"objectives": ["Destroy two waves of Creepling gliders", "Bring down Dark Kat's warship: turrets first, then the armored hull"],
-	},
-	{
-		"id": "ep02",
-		"number": "Episode 2",
-		"title": "Turmoil Rising",
-		"villain": "Turmoil",
-		"playable": false,
-		"story": "Turmoil's flying fortress rises over the bay with a demand: surrender Megakat City or watch it fall.",
-		"objectives": ["Coming in v0.3"],
-	},
-	{
-		"id": "ep03",
-		"number": "Episode 3",
-		"title": "Viper's Swamp",
-		"villain": "Dr. Viper",
-		"playable": false,
-		"story": "Mutant vines are tearing through downtown, and Dr. Viper is laughing from the sewers.",
-		"objectives": ["Coming in v0.3"],
-	},
-	{
-		"id": "free",
-		"number": "Free Flight",
-		"title": "Endless Defense",
-		"villain": "Everyone",
-		"script": "res://scripts/missions/free_flight.gd",
-		"playable": true,
-		"story": "No briefing, no Enforcers, no limits. Wave after wave of Creeplings. How long can the TurboKat hold the line?",
-		"objectives": ["Survive escalating waves", "Score as high as you can"],
-	},
-]
+## Every folder under res://episodes/ that holds an episode. Each folder is self-contained: an
+## `episode.gd` (menu card and briefing) and, for playable ones, a `mission.gd`, plus whatever
+## code, shaders and art only that episode uses. Adding an episode = a new folder + one line here
+## (the list is explicit so web exports never depend on scanning the packed file system).
+const EPISODE_FOLDERS: Array[String] = ["ep01_dark_skies", "ep02_turmoil_rising", "ep03_vipers_swamp", "free_flight"]
+
+## The episode cards, built from the folders above: {id, number, title, villain, story, objectives,
+## playable, folder, script}. `script` is the folder's mission.gd (empty for coming-soon episodes).
+var EPISODES: Array[Dictionary] = []
 
 var invert_pitch := true
 var muted := false
 ## Cinematic camera that follows special missiles.
 var missile_cam := true
 var best_scores := {}
+
+
+func _init() -> void:
+	for folder in EPISODE_FOLDERS:
+		var dir := "res://episodes/%s" % folder
+		var info: Dictionary = load(dir + "/episode.gd").new().info()
+		info["folder"] = dir
+		if ResourceLoader.exists(dir + "/mission.gd"):
+			info["script"] = dir + "/mission.gd"
+		EPISODES.append(info)
 
 
 func _ready() -> void:

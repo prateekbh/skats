@@ -61,7 +61,7 @@ Missiles lock on by themselves: keep a target in front of you until the diamond 
   shockwave rings, debris streaks, puffy missile trails, speed lines on afterburner and hit-stop on
   big kills. All pooled (no per-explosion allocations) to keep the web build smooth.
 - **Megakat City:** a 15 x 10 km world from a small data plan (`data/city_plan.json`): a Manhattan-dense downtown of towers up to 520 m around the 1,200 m MegaKat Tower, City Hall with a working clock tower, Enforcer HQ, commercial towers, residential neighbourhoods, an industrial waterfront with piers, cranes and ships, a park with a lake, the salvage yard with Jake & Chance's Garage, and mountains, a river, a dam, beaches and the open sea around it. Streets are tight canyons (32-85 m, wider avenues) but always connected, and three high bridges can be flown under. Supply caches with light beams sit near the ground (fly low to grab them; in Free Flight some are guarded by flak nests, Episode 1 is planes only) and are where you restock special missiles. Pitch is inverted by default (toggle with Y).
-- **Episode 1, *Dark Skies Over Megakat*:** two Creepling waves, then Dark Kat's warship (destroy the turrets, then the hull). Original radio dialogue for Razor, T-Bone, Callie, Feral and Dark Kat.
+- **Episode 1, *Dark Skies Over Megakat*:** two Creepling waves, then Dark Kat's own jet: it flies inside an energy shield and fires lasers; two missile hits show the shield works, then a cutscene arms two Scrambler Missiles. Miss both and it's game over, hit once and the shield drops. Original radio dialogue for Razor, T-Bone, Callie, Feral and Dark Kat.
 - **Free Flight:** endless escalating waves for score attack.
 - **Story:** radio chatter arrives as comic cards with the speaker's portrait and an expression for
   the line, and between the parts of an episode the game pauses for comic-strip story beats from
@@ -97,8 +97,9 @@ scenes/main.tscn              entry scene → scripts/main.gd (state machine)
 scripts/autoload/             Game (input, settings, saves, episodes) and Sfx (synthesized audio)
 scripts/player/               TurboKat flight model, procedural model, chase camera
 scripts/combat/               Target base class; bullets, missiles, explosions, pickups
-scripts/enemies/              Creepling gliders/bombers, Dark Kat's warship
-scripts/missions/             one script per episode (extends Mission)
+scripts/enemies/              enemies shared by episodes: Creepling gliders/bombers, ground flak
+scripts/missions/mission.gd   the Mission base class every episode extends
+episodes/<name>/              one self-contained folder per episode (mission, boss, shaders, card)
 scripts/world/city.gd         Megakat City generator + collision height field
 scripts/ui/                   HUD and menus (built in code)
 shaders/                      buildings, ground, water
@@ -129,11 +130,13 @@ flying skill. `--showcase` saves screenshots of the TurboKat from six angles.
 
 ## Adding an episode
 
-1. Create `scripts/missions/epNN_title.gd` extending `Mission`.
-2. Implement `start()`, `update(dt)` and `objective()`, using helpers such as `spawn_wave()`, `radio()`, `after()`, `win()` and `fail()`.
-3. Add an entry to `Game.EPISODES` in `scripts/autoload/game.gd`.
+Each episode is one folder under `episodes/` with an `episode.gd` (menu card) and a `mission.gd`
+(extends `Mission`), plus any boss, shader or art only that episode uses. Register the folder in
+`Game.EPISODE_FOLDERS`. Full steps in [`episodes/README.md`](episodes/README.md).
 
 ## Contributing
 
-Pull requests are welcome. Please keep the repository free of copyrighted material from the
-show: write new dialogue, and make assets yourself or in code.
+Pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and run
+`tools/check.sh` first. Keep the repository free of copyrighted material from the show: write new
+dialogue, and make assets yourself or in code. A map of the code is in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

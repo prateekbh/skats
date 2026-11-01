@@ -120,7 +120,7 @@ Ann Gora (news reporter in the Good Kat Blimp). Characters and their traits foll
 ### Episode 1: Dark Skies Over Megakat (three parts)
 
 Dark Kat is cutting the city's head off, piece by piece: Enforcer HQ, then City Hall, then HQ
-again with the bomb. Story is told as comic strips (`ComicStrip`, `scripts/missions/ep01_dark_skies.gd`):
+again with the bomb. Story is told as comic strips (`ComicStrip`, `episodes/ep01_dark_skies/mission.gd`):
 
 | Beat | When | What happens |
 |---|---|---|
@@ -214,12 +214,12 @@ scripts/player/chase_camera.gd    chase/cockpit/cinematic camera, shake
 scripts/combat/combat.gd    bullets (MultiMesh), missiles, explosions, pickups, target registry
 scripts/combat/target.gd    base class for anything that can be shot
 scripts/enemies/*.gd        enemy AI + procedural models
-scripts/missions/*.gd       one script per episode, extends Mission
+episodes/<name>/            one self-contained folder per episode (mission.gd extends Mission)
 scripts/ui/hud.gd, menu.gd  HUD drawn with _draw(); menus built in code
 shaders/*.gdshader          buildings, ground, water
 ```
 
-**Adding an episode:** create `scripts/missions/epNN_name.gd` extending `Mission`, implement
+**Adding an episode:** create `episodes/epNN_name/` (see `episodes/README.md`) with a `mission.gd` extending `Mission`, implement
 `start()`, `update(dt)` and `objective()`, then add an entry to `Game.EPISODES`.
 
 **Performance budget (web):** at most 60 live targets, at most 600 bullets (2 MultiMesh draws),

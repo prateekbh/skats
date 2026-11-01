@@ -31,6 +31,14 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           unzip -q -j templates.tpz 'templates/web_*' -d ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
 
+      - name: Check episode folders
+        run: |
+          for d in episodes/*/; do
+            n=$(basename "$d")
+            [ -f "$d/episode.gd" ] || { echo "missing episode.gd in $d"; exit 1; }
+            grep -q "\"$n\"" scripts/autoload/game.gd || { echo "$n is not in Game.EPISODE_FOLDERS"; exit 1; }
+          done
+
       # God-mode autopilot plays Episode 1. Exit 0 = mission won, 1 = time limit reached
       # (both fine); anything else (mission failed, crash) fails the build.
       - name: Smoke test (autopilot plays Episode 1 for 60 s)

@@ -709,8 +709,9 @@ func _view_shot() -> void:
 	camera.global_position = Vector3(c[0], c[1], c[2])
 	camera.look_at(Vector3(l[0], l[1], l[2]), Vector3.UP)
 	if _opts.has("jetview"):
-		# --jetview: Dark Kat's jet frozen at the look point, nose along -Z (or --jetyaw=<deg>).
-		var jet := DarkKatJet.new()
+		# --jetview[=<boss script>]: Dark Kat's jet (or another boss) frozen at the look point, nose along -Z (or --jetyaw=<deg>).
+		var jet_path := String(_opts.jetview) if String(_opts.jetview).begins_with("res://") else "res://episodes/ep01_dark_skies/dark_kat_jet.gd"
+		var jet: Target = load(jet_path).new()
 		jet.anchor = Vector3(l[0], l[1], l[2])
 		spawn_boss(jet)
 		jet.set_process(false)

@@ -135,7 +135,7 @@ func _build() -> void:
 	MeshKit.part(_model, MeshKit.slab(tail_r, 0.3), red, Vector3(0, 0.2, 0))
 	MeshKit.part(_model, MeshKit.slab(tail_l, 0.3), red, Vector3(0, 0.2, 0))
 	_shield_mat = ShaderMaterial.new()
-	_shield_mat.shader = load("res://shaders/shield.gdshader")
+	_shield_mat.shader = load("res://episodes/ep01_dark_skies/shield.gdshader")
 	_shield = MeshInstance3D.new()
 	var sm := SphereMesh.new()
 	sm.radius = SHIELD_RADIUS
