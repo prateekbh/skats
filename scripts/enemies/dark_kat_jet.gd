@@ -90,13 +90,15 @@ func _build() -> void:
 	# three black slits (left, centre, right) painted along its front face.
 	var plate := PackedVector2Array([Vector2(-2.3, 0.0), Vector2(2.3, 0.0), Vector2(1.9, -4.6), Vector2(-1.9, -4.6)])
 	var plate_mesh := MeshKit.slab(plate, 0.9)
+	# The end of the nose tapers like a triangle, to a narrow tip.
+	var tip_mesh := MeshKit.slab(PackedVector2Array([Vector2(-2.2, 0.0), Vector2(2.2, 0.0), Vector2(0.35, -4.6), Vector2(-0.35, -4.6)]), 0.9)
 	var seg_a := Transform3D(Basis.from_euler(Vector3(-0.2, 0, 0)), Vector3(0, -0.2, -7.8))
 	MeshKit.part(_model, plate_mesh, red).transform = Transform3D(seg_a.basis * Basis.from_scale(Vector3(1, 1, 0.65)), seg_a.origin)
 	var seg_b := Transform3D(seg_a.basis * Basis.from_euler(Vector3(-0.7, 0, 0)), seg_a * Vector3(0, -0.1, -3.0))
-	MeshKit.part(_model, plate_mesh, red).transform = Transform3D(seg_b.basis * Basis.from_scale(Vector3(1.05, 1, 0.8)), seg_b.origin)
+	MeshKit.part(_model, tip_mesh, red).transform = Transform3D(seg_b.basis * Basis.from_scale(Vector3(1.05, 1, 0.8)), seg_b.origin)
 	for x in [-1.05, 0.0, 1.05]:
 		var slit := MeshKit.part(_model, MeshKit.box(Vector3(0.5, 0.05, 2.9)), dark)
-		slit.transform = Transform3D(seg_b.basis, seg_b * Vector3(x * 0.95, 0.47, -2.0))
+		slit.transform = Transform3D(seg_b.basis * Basis.from_euler(Vector3(0, 0.26 * signf(x), 0)), seg_b * Vector3(x * 0.8, 0.47, -1.9))
 	for sx in [-1.0, 1.0]:
 		# Slanted green-yellow eyes and the thin red horns sticking out of the head.
 		MeshKit.part(_model, MeshKit.box(Vector3(0.2, 0.55, 1.6)), eye, Vector3(2.55 * sx, 0.1, -7.2), Vector3(0, 0, 0.5 * sx))
