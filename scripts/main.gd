@@ -708,6 +708,16 @@ func _view_shot() -> void:
 	camera.fov = float(_opts.get("fov", "68"))
 	camera.global_position = Vector3(c[0], c[1], c[2])
 	camera.look_at(Vector3(l[0], l[1], l[2]), Vector3.UP)
+	if _opts.has("jetview"):
+		# --jetview: Dark Kat's jet frozen at the look point, nose along -Z (or --jetyaw=<deg>).
+		var jet := DarkKatJet.new()
+		jet.anchor = Vector3(l[0], l[1], l[2])
+		spawn_boss(jet)
+		jet.set_process(false)
+		jet.global_position = Vector3(l[0], l[1], l[2])
+		jet.rotation_degrees = Vector3(0, float(_opts.get("jetyaw", "0")), 0)
+		if _opts.has("noshield"):
+			jet._shield.visible = false
 	for i in 6:
 		await get_tree().process_frame
 	camera.global_position = Vector3(c[0], c[1], c[2])
@@ -1035,6 +1045,12 @@ func _autopilot_fight() -> void:
 			player.ai.aim = (best.global_position + best.velocity * muzzle_t - player.global_position).normalized()
 			player.ai.fire = true
 	player.ai.missile = player.locked and randf() < 0.02
+	if _opts.has("bossmiss") and player.selected_special().id == "scrambler" and player.special_ammo.get("scrambler", 0) > 0 and _test_t > 5.0 and fmod(_test_t, 2.0) < 0.05:
+		# --bossmiss: fire both Scramblers into the ground to test the game-over path.
+		player.special_ammo["scrambler"] -= 1
+		player.global_transform.basis = Basis.looking_at(Vector3.DOWN, Vector3.RIGHT)
+		player._fire_special(player.selected_special())
+	player.ai.special = player.locked and player.selected_special().id == "scrambler" and not _opts.has("bossmiss") and best_d < 700.0 and local.z < -0.9
 
 
 var _six_t := 0.0

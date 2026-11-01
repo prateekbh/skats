@@ -11,6 +11,8 @@ var hp := 100.0
 var radius := 6.0
 var lockable := true
 var invulnerable := false
+## Can still be locked while invulnerable (a shielded boss: missiles must be able to home on it).
+var lock_through_armor := false
 var alive := true
 var score := 100
 var display_name := "Target"

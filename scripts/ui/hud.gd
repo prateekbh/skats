@@ -467,13 +467,16 @@ func _draw_rack_card(p: TurboKat, def: Dictionary, screen: Rect2, img_h: float, 
 	var u1 := (vis_r - x0) / sw
 	var ammo: int = p.special_ammo.get(def.id, 0)
 	var tex: Texture2D = _rack_art.get(def.id)
-	var tint := Color.WHITE if ammo > 0 else Color(0.4, 0.4, 0.45)
+	var tint := Color.WHITE if ammo > 0 and not p.locked_specials.has(def.id) else Color(0.4, 0.4, 0.45)
 	var img := Rect2(vis_l, screen.position.y, vis_r - vis_l, img_h)
 	if tex:
 		var ts := tex.get_size()
 		draw_texture_rect_region(tex, img, Rect2(u0 * ts.x, 0, (u1 - u0) * ts.x, ts.y), tint)
 	else:
 		draw_rect(img, def.color * tint)
+	if p.locked_specials.has(def.id):
+		draw_rect(img, Color(0, 0, 0, 0.55))
+		_text(Vector2(vis_l, img.position.y + img_h * 0.55), "OFFLINE", int(18 * ui), RED, HORIZONTAL_ALIGNMENT_CENTER, vis_r - vis_l)
 	var col: Color = def.color
 	var plate := Rect2(vis_l, screen.position.y + img_h, vis_r - vis_l, screen.size.y - img_h)
 	draw_rect(plate, col.darkened(0.45))

@@ -27,6 +27,7 @@ var _missiles: Array[Dictionary] = []
 var _pickups: Array[Node3D] = []
 var _player_mm: MultiMesh
 var _enemy_mm: MultiMesh
+var _laser_mm: MultiMesh
 ## Reusable missile bodies, keyed by weapon id.
 var _missile_pools := {}
 ## Octopus Missile tentacle rigs: reusable, and the ones currently holding a captive.
@@ -50,6 +51,7 @@ var on_message: Callable
 func _ready() -> void:
 	_player_mm = _make_tracer_mm(Color(1.0, 0.9, 0.45), Vector3(0.28, 0.28, 7.0))
 	_enemy_mm = _make_tracer_mm(Color(1.0, 0.25, 0.2), Vector3(0.9, 0.9, 4.5))
+	_laser_mm = _make_tracer_mm(Color(1.0, 0.3, 0.8), Vector3(0.8, 0.8, 22.0))
 	vfx = VFX.new()
 	add_child(vfx)
 	for k in PIECE_POOL:
@@ -211,6 +213,13 @@ func fire_bullet(pos: Vector3, vel: Vector3, team: int, dmg: float, life := 1.6,
 		stats.shots += 1
 
 
+## A boss laser bolt: long, fast and magenta, drawn with its own MultiMesh.
+func fire_laser(pos: Vector3, vel: Vector3, dmg: float) -> void:
+	if _bullets.size() >= MAX_BULLETS:
+		return
+	_bullets.append({"p": pos, "v": vel, "life": 2.0, "dmg": dmg, "team": ENEMY_TEAM, "size": 1.6, "laser": true})
+
+
 func _process(delta: float) -> void:
 	_armor_ping_cd -= delta
 	_armor_msg_cd -= delta
@@ -263,6 +272,7 @@ func _update_bullets(dt: float) -> void:
 func _draw_bullets() -> void:
 	var np := 0
 	var ne := 0
+	var nl := 0
 	for b in _bullets:
 		var dir: Vector3 = (b.v as Vector3).normalized()
 		var up := Vector3.UP if absf(dir.y) < 0.98 else Vector3.RIGHT
@@ -270,11 +280,15 @@ func _draw_bullets() -> void:
 		if b.team == PLAYER_TEAM:
 			_player_mm.set_instance_transform(np, Transform3D(basis, b.p))
 			np += 1
+		elif b.get("laser", false):
+			_laser_mm.set_instance_transform(nl, Transform3D(basis, b.p))
+			nl += 1
 		else:
 			_enemy_mm.set_instance_transform(ne, Transform3D(basis.scaled(Vector3.ONE * b.size), b.p))
 			ne += 1
 	_player_mm.visible_instance_count = np
 	_enemy_mm.visible_instance_count = ne
+	_laser_mm.visible_instance_count = nl
 
 
 # --- missiles ---------------------------------------------------------------------
@@ -502,6 +516,8 @@ func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
 			var smoke := city.damage_at(p, power)
 			if smoke != Vector3.INF:
 				vfx.add_smoke_column(smoke, clampf(power, 0.8, 1.5))
+	if hit and hit.has_method("missile_struck") and hit.missile_struck(def, p):
+		return # absorbed (Dark Kat's shield)
 	match def.behaviour:
 		"capture":
 			# Octopus: restrain the target. A captured glider loses lift and falls.
@@ -526,6 +542,8 @@ func _missile_hit(def: Dictionary, p: Vector3, hit: Target) -> void:
 				Sfx.play_at("armor", p, camera.global_position, 4.0, 0.5)
 			for t in targets:
 				if t.alive and t.global_position.distance_to(p) < def.radius + t.radius:
+					if t.has_method("scrambled") and t.scrambled(def):
+						continue
 					t.take_damage(def.damage, t.global_position)
 					t.stun(def.disable)
 		"pierce":
@@ -718,6 +736,16 @@ func muzzle_flash(pos: Vector3) -> void:
 
 
 ## Hits on armored parts spark grey and remind the player where to aim.
+## The ricochet effect and sound without the "ARMORED" message (Dark Kat's shield).
+func armor_ping_quiet(point: Vector3) -> void:
+	if _armor_ping_cd > 0.0:
+		return
+	_armor_ping_cd = 0.08
+	vfx.ricochet(point)
+	if camera:
+		Sfx.play_at("armor", point, camera.global_position, -6.0)
+
+
 func armor_ping(point: Vector3) -> void:
 	if _armor_ping_cd > 0.0:
 		return

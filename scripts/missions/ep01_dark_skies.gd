@@ -4,16 +4,21 @@ extends Mission
 ##   Prologue  (strip, after the episode is chosen)  a news flash, HQ under attack, Callie's call
 ##   Part 1    First Strike     Creeplings over Enforcer HQ; it was bait
 ##   Part 2    Breaking News    gliders and bombers over City Hall; Dark Kat takes over the airwaves
-##   Part 3    Dark Kat City    the Fear Ship II; the Enforcer building is the target
+##   Part 3    Dark Kat City    Dark Kat's own jet, inside an energy shield; the Enforcer building is the target
 ##   Epilogue  (strip)          the aftermath
 ##
 ## Dark Kat is cutting the city's head off piece by piece: HQ, then City Hall, then HQ again with
 ## the bomb. All dialogue is original fan writing.
+##
+## The boss fight: the jet's shield shrugs off two missile hits, a cutscene arms the Scrambler
+## Missiles (locked until then, and then the default selection) with exactly two shots. Both
+## missing is game over; one hit drops the shield and the jet takes damage from everything.
 
-enum Phase { WAVE_1, WAVE_2, BOSS, OUTRO }
+enum Phase { WAVE_1, WAVE_2, BOSS_SHIELD, BOSS_SCRAMBLE, BOSS_OPEN, OUTRO }
 
 var phase := Phase.WAVE_1
-var boss: DarkKatWarship
+var boss: DarkKatJet
+var _scramblers_fired := 0
 var _advancing := false
 var _spotted := false
 
@@ -47,13 +52,23 @@ func strips() -> Dictionary:
 		],
 		"wave2": [
 			{"who": "Dark Kat", "mood": "sneer", "caption": "Every channel in Megakat City",
-				"text": "Citizens of Megakat City, tonight your Enforcers fall. My Fear Ship II rises, and by dawn this will be Dark Kat City!"},
+				"text": "Citizens of Megakat City, tonight your Enforcers fall. I'm coming for them myself, and by dawn this will be Dark Kat City!"},
 			{"who": "Callie Briggs", "mood": "alarmed", "caption": "City Hall",
-				"text": "He's hijacked every channel. SWAT Kats, that bomb bay is aimed at the Enforcer building!"},
+				"text": "He's hijacked every channel. SWAT Kats, he's carrying the bomb himself, and it's meant for the Enforcer building!"},
 			{"who": "Ann Gora", "mood": "reporting", "caption": "Good Kat Blimp",
-				"text": "The broadcast is hijacked, folks, but my camera sees it: something enormous, rising out of the clouds over the bay."},
+				"text": "The broadcast is hijacked, folks, but my camera sees it: one purple jet, screaming in out of the clouds over the bay."},
 			{"who": "Razor", "mood": "focused", "caption": "The TurboKat",
-				"text": "That's not a ship. That's a flying fortress."},
+				"text": "That's Dark Kat's own fighter. And my scanner says it's wrapped in some kind of energy field."},
+		],
+		"shield": [
+			{"who": "T-Bone", "mood": "grin", "caption": "The TurboKat",
+				"text": "Two direct hits and not a scratch! What is that thing made of?"},
+			{"who": "Razor", "mood": "focused", "caption": "The TurboKat",
+				"text": "It's not the armor, buddy, it's the field around it. A shield generator. Our missiles are just bouncing off."},
+			{"who": "Razor", "mood": "focused", "caption": "The TurboKat",
+				"text": "A million megavolts will short it out. I'm arming the Scrambler Missiles. But I've only got two."},
+			{"who": "T-Bone", "mood": "grin", "caption": "The TurboKat",
+				"text": "Two shots. No pressure. Lock him up and make 'em count!"},
 		],
 		"epilogue": [
 			{"who": "Dark Kat", "mood": "angry", "caption": "Escape pod",
@@ -82,6 +97,12 @@ func intro() -> Array:
 
 
 func start() -> void:
+	if main._opts.has("boss"):
+		_start_boss() # --boss: jump to the final fight (testing)
+		var hq: Vector3 = main.city.enforcer_hq_pos + Vector3(0, 450, 0)
+		main.player.global_position = hq + Vector3(-700, 0, 0)
+		main.player.look_at(hq, Vector3.UP)
+		return
 	var hq: Vector3 = main.city.enforcer_hq_pos
 	spawn_wave(hq + Vector3(0, 280, 0), 6)
 	radio("Razor", "Enforcer HQ is %.0f klicks out across the city. Light the afterburner, Shift, and keep it low over the rooftops." % (main.player.global_position.distance_to(hq) / 1000.0), 5.5)
@@ -97,18 +118,19 @@ func objective() -> String:
 			return "PART 1/3: DESTROY THE CREEPLINGS (%d LEFT)%s" % [enemies_alive(), far_note()]
 		Phase.WAVE_2:
 			return "PART 2/3: DEFEND CITY HALL (%d LEFT)%s" % [enemies_alive(), far_note()]
-		Phase.BOSS:
-			if boss and boss.phase == 0:
-				var n := 0
-				for t in boss.turrets:
-					if t.alive:
-						n += 1
-				return "PART 3/3: FEAR SHIP II: DESTROY THE FLAK TURRETS (%d LEFT)" % n
-			return "PART 3/3: FEAR SHIP II: DESTROY THE HULL"
+		Phase.BOSS_SHIELD:
+			return "PART 3/3: DARK KAT'S JET: HIT IT WITH MISSILES (%d/%d)" % [boss.proof_hits if boss else 0, DarkKatJet.PROOF_HITS]
+		Phase.BOSS_SCRAMBLE:
+			return "PART 3/3: SCRAMBLE THE SHIELD: %d SHOTS LEFT" % maxi(0, 2 - _scramblers_fired)
+		Phase.BOSS_OPEN:
+			return "PART 3/3: SHIELD DOWN: DESTROY THE JET"
 	return "DARK KAT IS ESCAPING..."
 
 
 func update(_dt: float) -> void:
+	if phase == Phase.BOSS_SCRAMBLE and _scramblers_fired >= 2 and boss and boss.shield_up and not _scrambler_in_flight():
+		fail("Both Scrambler Missiles missed. The shield held and Dark Kat got away.")
+		return
 	if phase == Phase.WAVE_1 and not _spotted and far_note() == "" and enemies_alive() > 0:
 		# Close enough to see it: the Creeplings aren't really attacking HQ, they're pulling the
 		# Enforcer jets off it.
@@ -141,29 +163,62 @@ func _start_wave_2() -> void:
 	_advancing = false
 
 
+func _scrambler_in_flight() -> bool:
+	for m in main.combat._missiles:
+		if m.def.id == "scrambler":
+			return true
+	return false
+
+
 func _start_boss() -> void:
-	phase = Phase.BOSS
-	var ship := DarkKatWarship.new()
-	ship.center = main.city.enforcer_hq_pos # the Fear Ship II circles Enforcer HQ
-	boss = main.spawn_boss(ship)
-	boss.spawn_glider = func(pos: Vector3): main.spawn_creepling(pos, false, pos)
-	boss.phase_changed.connect(_on_boss_phase)
-	boss.destroyed.connect(_on_boss_destroyed)
-	main.hud.message("WARNING: LARGE CONTACT", 3.0)
+	phase = Phase.BOSS_SHIELD
+	main.player.lock_special("scrambler", true) # not before the cutscene
+	var jet := DarkKatJet.new()
+	jet.anchor = main.city.enforcer_hq_pos + Vector3(0, 450, 0)
+	boss = main.spawn_boss(jet)
+	boss.shield_proven.connect(_on_shield_proven)
+	boss.shield_broken.connect(_on_shield_broken)
+	boss.died.connect(_on_boss_destroyed)
+	main.player.special_fired.connect(_on_special_fired)
+	main.hud.message("WARNING: HOSTILE FIGHTER", 3.0)
 	Sfx.play("alarm", -6.0)
-	radio("Razor", "The hull's armored. Take out the three flak turrets first!", 4.0)
-	radio("Lt. Felina Feral", "I'll draw their fire. Go for the turrets, SWAT Kats!", 4.0, "alert")
+	radio("Razor", "Single bogey, big and fast. Missiles, buddy. Make it count!", 4.0)
+	radio("Dark Kat", "Burn, SWAT Kats! My laser cannons will melt your little jet!", 3.5, "angry")
 
 
-func _on_boss_phase(_p: int) -> void:
-	message("ARMOR DOWN")
-	radio("Razor", "Turrets are scrap and the hull's exposed! Hit it with the Mega-Missile, R!", 4.5)
-	radio("Dark Kat", "Launch the gliders! All of them!", 3.0, "angry")
+func _on_special_fired(_missiles: Array, def: Dictionary) -> void:
+	if def.id == "scrambler":
+		_scramblers_fired += 1
 
 
-func _on_boss_destroyed() -> void:
+func _on_shield_proven() -> void:
+	if phase != Phase.BOSS_SHIELD:
+		return
+	phase = Phase.BOSS_SCRAMBLE
+	after(0.9, func(): cutscene(strips()["shield"], _arm_scramblers))
+
+
+func _arm_scramblers() -> void:
+	boss.scramble_ready = true
+	main.player.unlock_and_select("scrambler", 2)
+	message("SCRAMBLER MISSILES ARMED: 2 SHOTS", 3.5)
+	Sfx.play("beep", -4.0, 1.2)
+	radio("Razor", "Scramblers are hot, and they're your default now. Lock on, then fire with R!", 4.5)
+
+
+func _on_shield_broken() -> void:
+	if phase != Phase.BOSS_SCRAMBLE:
+		return
+	phase = Phase.BOSS_OPEN
+	main.slow_motion(0.8)
+	message("SHIELD DOWN", 3.0)
+	radio("Razor", "Shield's fried! Everything we've got works on him now. Hit him!", 4.0)
+	radio("Dark Kat", "Impossible! You'll pay for that, SWAT Kats!", 3.5, "angry")
+
+
+func _on_boss_destroyed(_t: Target) -> void:
 	phase = Phase.OUTRO
 	main.slow_motion(1.6)
-	message("FEAR SHIP II DESTROYED", 3.5)
+	message("DARK KAT'S JET DESTROYED", 3.5)
 	radio("T-Bone", "Bill it to the salvage yard, creep.", 3.0, "grin")
 	after(4.5, func(): cutscene(strips()["epilogue"], win))

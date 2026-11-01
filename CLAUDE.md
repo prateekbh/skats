@@ -54,6 +54,12 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   tapered block `FRUST`, pyramid `PYR`) with non-colliding trim (plinths, cornices via `S.TRIM`), crowns (`_crown`),
   towers with setbacks/taper/offset stacks (`_tower`), water tanks, fire escapes (`S.ESCAPE`, see-through shader style) and
   house garages/porches. The facade shader adds recessed windows, sills, quoins and steel corner fins. Mesh kinds must stay < 8.
+- Episode 1's boss is `DarkKatJet` (`scripts/enemies/dark_kat_jet.gd`, 2.5x the TurboKat, shield + lasers via
+  `Combat.fire_laser`). Shield rules live in the jet (`missile_struck` / `scrambled` hooks called from `Combat._missile_hit`)
+  and the mission (`ep01_dark_skies.gd`: two absorbed hits -> cutscene -> `TurboKat.unlock_and_select("scrambler", 2)`; both
+  Scramblers missing = game over). `TurboKat.locked_specials` keeps a special off the rack. Test with
+  `--autotest --god --boss` (win path) and `--boss --bossmiss` (game-over path); `--viewshot=... --jetview [--noshield]`
+  renders the jet.
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
   created per shot or per explosion. Effects go through the pooled `VFX` system
   (`scripts/fx/vfx.gd`, one MultiMesh per effect type); missile bodies are pooled in `Combat`.

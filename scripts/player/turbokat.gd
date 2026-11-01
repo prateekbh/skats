@@ -30,6 +30,8 @@ var max_missiles := 16
 ## Special-missile rack (see Arsenal): ammo per weapon id and the selected slot.
 var special_ammo := {}
 var special_index := 0
+## Specials a mission keeps off the rack for now (ids): they can't be selected, fired or restocked.
+var locked_specials: Array[String] = []
 var alive := true
 var boosting := false
 
@@ -109,6 +111,7 @@ func reset(pos: Vector3, look_target: Vector3) -> void:
 	for def in Arsenal.SPECIALS:
 		special_ammo[def.id] = def.ammo
 	special_index = 0
+	locked_specials.clear()
 	alive = true
 	visible = true
 	lock_target = null
@@ -256,10 +259,15 @@ func _weapons(dt: float) -> void:
 		var pos := global_transform * Vector3(4.0 * _missile_side, -1.2, -0.5)
 		combat.fire_missile(pos, forward(), speed, lock_target if locked else null)
 	if player_control and Input.is_action_just_pressed("cycle_special") and Arsenal.SPECIALS.size() > 1:
-		special_index = (special_index + 1) % Arsenal.SPECIALS.size()
+		for k in Arsenal.SPECIALS.size():
+			special_index = (special_index + 1) % Arsenal.SPECIALS.size()
+			if not locked_specials.has(selected_special().id):
+				break
 		Sfx.play("beep", -8.0, 0.8) # the HUD carousel turns to the new card
 	var special := selected_special()
-	if player_control and Input.is_action_just_pressed("fire_special") and special_ammo.get(special.id, 0) > 0 and _missile_cd <= 0.0:
+	var want_special: bool = Input.is_action_just_pressed("fire_special") if player_control else ai.get("special", false)
+	ai.special = false
+	if want_special and not locked_specials.has(special.id) and special_ammo.get(special.id, 0) > 0 and _missile_cd <= 0.0:
 		special_ammo[special.id] -= 1
 		_missile_cd = 0.6
 		_fire_special(special)
@@ -340,7 +348,7 @@ func _update_lock(dt: float) -> void:
 	var best: Target = null
 	var best_ang := LOCK_CONE
 	for t in combat.targets:
-		if not t.alive or not t.lockable or t.invulnerable:
+		if not t.alive or not t.lockable or (t.invulnerable and not t.lock_through_armor):
 			continue
 		var to := t.global_position - global_position
 		var d := to.length()
@@ -434,7 +442,7 @@ func collect_cache(c: Dictionary) -> String:
 				parts.append("BLOWTORCH +%d" % int(c[k]))
 			_:
 				for def in Arsenal.SPECIALS:
-					if def.id == k:
+					if def.id == k and not locked_specials.has(k):
 						special_ammo[k] = mini(special_ammo.get(k, 0) + int(c[k]), def.max)
 						parts.append("%s +%d" % [str(def.name).replace(" Missile", "").to_upper(), int(c[k])])
 	return "  ".join(parts)
@@ -446,7 +454,8 @@ func collect(kind: String) -> void:
 	else:
 		missiles = max_missiles
 		for def in Arsenal.SPECIALS:
-			special_ammo[def.id] = mini(special_ammo.get(def.id, 0) + 1, def.max)
+			if not locked_specials.has(def.id):
+				special_ammo[def.id] = mini(special_ammo.get(def.id, 0) + 1, def.max)
 
 
 func crash() -> void:
@@ -460,3 +469,24 @@ func crash() -> void:
 	_damage_smoke.emitting = false
 	combat.explode(global_position, 2.6)
 	destroyed.emit()
+
+
+## Takes a special off the rack (or puts it back) and, when unlocking, selects it with `ammo` rounds.
+func lock_special(id: String, locked: bool) -> void:
+	if locked and not locked_specials.has(id):
+		locked_specials.append(id)
+		if selected_special().id == id:
+			for k in Arsenal.SPECIALS.size():
+				special_index = (special_index + 1) % Arsenal.SPECIALS.size()
+				if not locked_specials.has(selected_special().id):
+					break
+	elif not locked:
+		locked_specials.erase(id)
+
+
+func unlock_and_select(id: String, ammo: int) -> void:
+	lock_special(id, false)
+	special_ammo[id] = ammo
+	for k in Arsenal.SPECIALS.size():
+		if Arsenal.SPECIALS[k].id == id:
+			special_index = k
