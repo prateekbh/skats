@@ -86,16 +86,18 @@ func _build() -> void:
 	# Fuselage and a bulbous skull-like head.
 	MeshKit.part(_model, MeshKit.sphere(1.0, 20), red, Vector3(0, 0, 2.0), Vector3.ZERO, Vector3(2.8, 2.0, 9.0))
 	MeshKit.part(_model, MeshKit.sphere(1.0, 20), red, Vector3(0, 0.2, -6.0), Vector3.ZERO, Vector3(3.1, 2.7, 4.6))
-	# The iconic bent nose: a beak hooking down, with black slits on both sides.
-	MeshKit.part(_model, MeshKit.cyl(0.25, 2.5, 6.5, 12), red, Vector3(0, -2.0, -9.6), hook)
+	# The iconic nose: a flat, broad plate that runs forward and then bends sharply down, with
+	# three black slits (left, centre, right) painted along its front face.
+	var plate := PackedVector2Array([Vector2(-2.3, 0.0), Vector2(2.3, 0.0), Vector2(1.9, -4.6), Vector2(-1.9, -4.6)])
+	var plate_mesh := MeshKit.slab(plate, 0.9)
+	var seg_a := Transform3D(Basis.from_euler(Vector3(-0.2, 0, 0)), Vector3(0, -0.2, -7.8))
+	MeshKit.part(_model, plate_mesh, red).transform = Transform3D(seg_a.basis * Basis.from_scale(Vector3(1, 1, 0.65)), seg_a.origin)
+	var seg_b := Transform3D(seg_a.basis * Basis.from_euler(Vector3(-0.7, 0, 0)), seg_a * Vector3(0, -0.1, -3.0))
+	MeshKit.part(_model, plate_mesh, red).transform = Transform3D(seg_b.basis * Basis.from_scale(Vector3(1.05, 1, 0.8)), seg_b.origin)
+	for x in [-1.05, 0.0, 1.05]:
+		var slit := MeshKit.part(_model, MeshKit.box(Vector3(0.5, 0.05, 2.9)), dark)
+		slit.transform = Transform3D(seg_b.basis, seg_b * Vector3(x * 0.95, 0.47, -2.0))
 	for sx in [-1.0, 1.0]:
-		# Black slits painted flat on the beak (thin decals lying on the cone's surface).
-		for sl in [[0.7, 3.0, 0.9], [-1.9, 1.7, 0.7]]: # centre along the beak, length, width
-			var t: float = (sl[0] + 3.25) / 6.5
-			var rr: float = 2.5 - 2.25 * t + 0.03
-			var mi := MeshKit.part(_model, MeshKit.box(Vector3(0.05, sl[1], sl[2])), dark)
-			mi.transform = Transform3D(Basis.from_euler(hook) * Basis.from_euler(Vector3(0, 0, 0.33 * sx)),
-				Vector3(0, -2.0, -9.6) + Basis.from_euler(hook) * Vector3(sx * rr, sl[0], 0))
 		# Slanted green-yellow eyes and the thin red horns sticking out of the head.
 		MeshKit.part(_model, MeshKit.box(Vector3(0.2, 0.55, 1.6)), eye, Vector3(2.55 * sx, 0.1, -7.2), Vector3(0, 0, 0.5 * sx))
 		var horn := PackedVector2Array([Vector2(0, -5.0), Vector2(5.6 * sx, -11.5), Vector2(1.0 * sx, -4.0)])
