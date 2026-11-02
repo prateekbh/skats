@@ -29,12 +29,18 @@ var _t0 := 0
 func _ready() -> void:
 	_t0 = Time.get_ticks_msec()
 	_log = "--analytics-log" in OS.get_cmdline_user_args()
-	_enabled = OS.has_feature("web") and JavaScriptBridge.eval("typeof window.skTrack === 'function'", true) == true
+	_enabled = OS.has_feature("web") and _page_has_tracker()
+
+
+func _page_has_tracker() -> bool:
+	return bool(JavaScriptBridge.eval("typeof window.skTrack === 'function'", true))
 
 
 ## Sends one event. Parameters are flattened to strings and numbers (GA4 limits: 40-character
 ## names, 25 parameters, 100-character string values).
 func track(event: String, params := {}) -> void:
+	if not _enabled and OS.has_feature("web"):
+		_enabled = _page_has_tracker() # the page may finish defining skTrack after this autoload started
 	if not _enabled and not _log:
 		return
 	var clean := {}
@@ -50,6 +56,8 @@ func track(event: String, params := {}) -> void:
 
 ## What the player is doing right now; the page reports it if they close the tab.
 func set_state(state: String) -> void:
+	if not _enabled and OS.has_feature("web"):
+		_enabled = _page_has_tracker()
 	if _enabled:
 		JavaScriptBridge.eval("window.skState = %s" % JSON.stringify(state))
 
