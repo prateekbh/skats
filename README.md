@@ -74,6 +74,12 @@ See [`docs/GDD.md`](docs/GDD.md) for the design document, Season 1 episode plan 
 
 ## Credits
 
+**Huge thanks to [swatkats.info](https://swatkats.info/)**, the SWAT Kats fan encyclopedia. It is the
+reference for the show's characters, weapons and episodes, and the source of the character portraits,
+cutscene panels, missile card art and music used in this game. See [`CREDITS.md`](CREDITS.md) for the
+full list.
+
+
 - Music: "Big Trouble" and "Drop Bomb" from the SWAT Kats score, © its owners, used in this
   non-commercial fan project. "Big Trouble" is trimmed to start at 0:04 (`web/launch/big_trouble.mp3`);
   "Drop Bomb" (`web/launch/drop_bomb.mp3`) plays during Episode 1's opening story.

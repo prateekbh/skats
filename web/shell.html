@@ -3,7 +3,24 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
-		<title>$GODOT_PROJECT_NAME</title>
+		<title>SWAT Kats: Megakat Skies — free fan game, play in your browser</title>
+		<meta name="description" content="Fly the TurboKat over Megakat City as Razor and T-Bone. A free, unofficial SWAT Kats fan game you play in your browser. Art and music credit: swatkats.info.">
+		<link rel="canonical" href="https://swatkatsfangame.com/">
+		<meta property="og:type" content="website">
+		<meta property="og:site_name" content="SWAT Kats: Megakat Skies">
+		<meta property="og:title" content="SWAT Kats: Megakat Skies — fly the TurboKat in your browser">
+		<meta property="og:description" content="Dogfight Dark Kat's jets over Megakat City, fire the show's special missiles and save the Enforcers. Free, no download. An unofficial fan game; art and music credit swatkats.info.">
+		<meta property="og:url" content="https://swatkatsfangame.com/">
+		<meta property="og:image" content="https://swatkatsfangame.com/launch/share_card.png">
+		<meta property="og:image:width" content="1200">
+		<meta property="og:image:height" content="630">
+		<meta property="og:image:alt" content="The TurboKat streaking over Megakat City under the SWAT Kats logo">
+		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:title" content="SWAT Kats: Megakat Skies — fly the TurboKat in your browser">
+		<meta name="twitter:description" content="A free, unofficial SWAT Kats fan game. Dogfight Dark Kat over Megakat City. Credit: swatkats.info.">
+		<meta name="twitter:image" content="https://swatkatsfangame.com/launch/share_card.png">
+		<meta name="twitter:image:alt" content="The TurboKat streaking over Megakat City under the SWAT Kats logo">
+		<meta name="theme-color" content="#1d4fb8">
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
 		<style>
@@ -107,6 +124,7 @@ body { background: var(--ink); overflow: hidden; touch-action: none; font-family
 .loading .bar i { display: block; height: 100%; width: 0%; background: repeating-linear-gradient(-45deg, var(--red) 0 12px, #ef4a2e 12px 24px); transition: width 0.25s; }
 .loading.indeterminate .bar i { width: 30%; animation: scan 1.1s ease-in-out infinite alternate; }
 @keyframes scan { from { margin-left: 0; } to { margin-left: 70%; } }
+.fine a { color: inherit; text-decoration: underline; pointer-events: auto; }
 .fine { position: absolute; z-index: 6; bottom: 4px; left: 0; right: 0; text-align: center; font-size: 11px; color: rgba(255, 255, 255, 0.8); }
 #status-notice { display: none; position: absolute; z-index: 7; left: 8%; right: 8%; top: 40%; background: #fff; border: 4px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 14px 18px; text-align: center; font-size: 16px; }
 
@@ -248,7 +266,7 @@ body { background: var(--ink); overflow: hidden; touch-action: none; font-family
 					<img class="logo anim" style="--d:1.9s" src="launch/logo.svg" alt="SWAT Kats: The Radical Squadron">
 					<div class="menu anim" style="--d:2.3s" id="menu"></div>
 					<div id="status-notice"></div>
-					<div class="fine">Unofficial non-commercial fan game · SWAT Kats and its characters © their owners · T-Bone &amp; Razor art by Feno (fan art)</div>
+					<div class="fine">Unofficial non-commercial fan game · SWAT Kats and its characters © Hanna-Barbera / Warner Bros. Discovery · Art, music and show details thanks to <a href="https://swatkats.info/" target="_blank" rel="noopener">swatkats.info</a> · T-Bone &amp; Razor art by Feno (fan art)</div>
 				</section>
 				<section class="panel p-villain anim" style="--d:0.25s; --r:4deg">
 					<div class="burst"></div>

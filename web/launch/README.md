@@ -23,3 +23,4 @@ python3 tools/prepare_launch_art.py
 | `city_attack.png` | A missile-damaged tower burning, rendered by the game | Launcher "KA-BLAM!" panel |
 
 CI copies `web/launch/*.png` and `*.svg` next to `index.html` (see `.github/workflows/web.yml`).
+| `share_card.png` | 1200x630 link-preview image (Open Graph / Twitter tags), rendered by `node tools/render_share_card.js` from `tools/share_card.html` | Shared links on Twitter/X, WhatsApp, Discord... |

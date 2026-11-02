@@ -9,6 +9,7 @@ game, so a few ground rules keep it safe to share.
   art in pull requests. Write new dialogue yourself and make art, models and sound from scratch
   or in code. (The few fan-use assets already in the repo are listed in the README credits and
   are not a precedent for adding more.)
+- **Credit your sources.** Anything taken from swatkats.info or another source goes in `CREDITS.md`.
 - **Stay canon.** Names, weapons, villains and story beats should match the show; the
   reference is <https://swatkats.info/>. If you can't check a detail, say so in the PR.
 - **Web first.** The game ships as a single-threaded WebGL2 build. Avoid per-frame allocations,
