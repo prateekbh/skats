@@ -6,6 +6,8 @@ extends RefCounted
 var main: Node
 var time := 0.0
 var finished := false
+## The last milestone() reached, reported with the mission result.
+var last_milestone := "start"
 var _timers: Array[Dictionary] = []
 
 
@@ -61,10 +63,20 @@ func radio(who: String, text: String, seconds := 4.5, mood := "") -> void:
 
 
 ## A comic-strip cutscene (game paused), then `then`. Panels: see ComicStrip.
-func cutscene(panels: Array, then: Callable) -> void:
+func cutscene(panels: Array, then: Callable, id := "") -> void:
 	if finished: # the player went down while the scene was waiting to start
 		return
-	main.show_comic(panels, then)
+	main.show_comic(panels, then, true, id)
+
+
+## Records progress inside the mission (an analytics funnel step): call it when the player clears a
+## wave, meets the boss, and so on. The last one reached is reported when the mission ends.
+func milestone(step: String) -> void:
+	last_milestone = step
+	Analytics.track("milestone", {
+		"episode_id": main.episode.id, "step": step, "mission_s": int(time),
+		"hull": int(main.player.hp), "score": main.combat.stats.score, "attempt": Analytics.attempt(main.episode.id),
+	})
 
 
 func message(text: String, seconds := 2.5) -> void:

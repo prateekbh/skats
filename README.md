@@ -134,6 +134,13 @@ Each episode is one folder under `episodes/` with an `episode.gd` (menu card) an
 (extends `Mission`), plus any boss, shader or art only that episode uses. Register the folder in
 `Game.EPISODE_FOLDERS`. Full steps in [`episodes/README.md`](episodes/README.md).
 
+## Analytics and privacy
+
+The hosted web build sends anonymous gameplay events (stage picked, progress, win or lose, which
+missiles are used) to Google Analytics so we can improve the game. It is skipped when your browser
+sends Do Not Track, and nothing is sent from desktop builds or tests. Details and the full event
+list: [`docs/ANALYTICS.md`](docs/ANALYTICS.md).
+
 ## Contributing
 
 Pull requests are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and run

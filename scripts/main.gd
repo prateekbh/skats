@@ -192,15 +192,20 @@ func _build_ui() -> void:
 	menu.launch.connect(launch_episode)
 	WebLauncher.launch_requested.connect(func(id: String): launch_episode(Game.episode_by_id(id)))
 	menu.resume.connect(_resume)
-	menu.restart.connect(func(): start_episode(episode))
-	menu.quit_to_title.connect(_show_title)
+	menu.restart.connect(func():
+		Analytics.track("retry", {"episode_id": episode.id, "from": "pause" if state == State.PAUSED else "debrief", "next_attempt": Analytics.attempt(episode.id) + 1})
+		Analytics.next_attempt(episode.id)
+		start_episode(episode))
+	menu.quit_to_title.connect(func():
+		Analytics.track("quit_to_menu", {"from": "pause" if state == State.PAUSED else "debrief", "episode_id": episode.id if not episode.is_empty() else ""})
+		_show_title())
 	comic = ComicStrip.new()
 	layer.add_child(comic)
 
 
 ## Plays a comic-strip cutscene, then calls `then`. Autotests skip it unless --comic is given.
 ## `pause`: freeze the game while it plays (not needed on the title screen).
-func show_comic(panels: Array, then: Callable, pause := true) -> void:
+func show_comic(panels: Array, then: Callable, pause := true, strip_id := "") -> void:
 	if (_autotest and not _opts.has("comic")) or panels.is_empty():
 		then.call()
 		return
@@ -211,10 +216,15 @@ func show_comic(panels: Array, then: Callable, pause := true) -> void:
 	# A strip dropped by a restart or quit must not resume its old callback later.
 	_comic_gen += 1
 	var gen := _comic_gen
+	var shown_at := Time.get_ticks_msec()
+	Analytics.track("comic_started", {"strip": strip_id, "episode_id": episode.id if not episode.is_empty() else _launch_ep.get("id", "")})
 	comic.play(panels)
 	await comic.finished
 	if gen != _comic_gen:
 		return
+	# A strip that closes faster than it could be read was skipped.
+	var secs := (Time.get_ticks_msec() - shown_at) / 1000.0
+	Analytics.track("comic_finished", {"strip": strip_id, "seconds": snappedf(secs, 0.1), "panels": panels.size(), "skipped": secs < panels.size() * 1.2})
 	if pause:
 		get_tree().paused = false
 	then.call()
@@ -265,9 +275,15 @@ const MCAM_TIME := 1.1 # unscaled seconds
 var _mcam := {}
 ## The stage waiting for the hatch launch to finish.
 var _launch_ep := {}
+var _loaded_sent := false
+## Per-run counters reported with the mission result.
+var _run_stats := {"specials": {}, "fps_sampled": false}
 
 
 func _on_special_fired(missiles: Array, def: Dictionary) -> void:
+	_run_stats.specials[def.id] = int(_run_stats.specials.get(def.id, 0)) + 1
+	Analytics.track("special_fired", {"weapon": def.id, "episode_id": episode.id, "ammo_left": int(player.special_ammo.get(def.id, 0)),
+		"mission_s": int(mission.time) if mission else 0})
 	hud.banner(def)
 	if not Game.missile_cam or (_autotest and not _opts.has("mcam")) or not _mcam.is_empty() or missiles.is_empty():
 		return
@@ -309,6 +325,11 @@ func slow_motion(real_seconds: float) -> void:
 
 func _show_title() -> void:
 	state = State.TITLE
+	Analytics.set_state("title")
+	if not _loaded_sent:
+		_loaded_sent = true
+		Analytics.track("game_loaded", {"load_ms": Time.get_ticks_msec()})
+	Analytics.track("launcher_shown", {"web_launcher": WebLauncher.active})
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	_clear_world()
@@ -335,6 +356,8 @@ func launch_episode(ep: Dictionary) -> void:
 		return
 	_launch_ep = ep
 	WebLauncher.hide()
+	Analytics.track("episode_selected", {"episode_id": ep.id, "attempt": Analytics.next_attempt(ep.id), "best_score": int(Game.best_scores.get(ep.id, 0))})
+	Analytics.set_state("story:" + String(ep.id))
 	var m: Mission = load(ep.script).new()
 	var intro := m.intro()
 	if intro.is_empty():
@@ -342,7 +365,7 @@ func launch_episode(ep: Dictionary) -> void:
 		return
 	if not _autotest:
 		Music.play_story()
-	show_comic(intro, _start_intro, false)
+	show_comic(intro, _start_intro, false, "intro")
 
 
 ## `from_launch`: straight out of the hatch launch, so the jet keeps flying where it is and the
@@ -385,6 +408,13 @@ func start_episode(ep: Dictionary, from_launch := false) -> void:
 	menu.hide_all()
 	hud.message("%s: %s" % [ep.number.to_upper(), ep.title.to_upper()], 3.2)
 	state = State.PLAYING
+	_run_stats = {"specials": {}, "fps_sampled": false}
+	Analytics.set_state("playing:" + String(ep.id))
+	Analytics.track("mission_started", {
+		"episode_id": ep.id, "attempt": Analytics.attempt(ep.id), "from_launch": from_launch,
+		"screen": "%dx%d" % [DisplayServer.window_get_size().x, DisplayServer.window_get_size().y],
+		"touch": DisplayServer.is_touchscreen_available(),
+	})
 	mission.start()
 	Music.fade_out(2.5)
 
@@ -434,6 +464,14 @@ func _show_debrief() -> void:
 	else:
 		rank = "—"
 	var new_best := Game.record_score(episode.id, score)
+	Analytics.track("mission_end", {
+		"episode_id": episode.id, "result": "win" if _end_win else "lose", "reason": _end_reason, "attempt": Analytics.attempt(episode.id),
+		"mission_s": int(mission.time), "score": score, "kills": s.kills, "accuracy": accuracy, "hull": int(player.hp),
+		"rank": rank, "new_best": new_best, "last_milestone": mission.last_milestone,
+		"specials_fired": _run_stats.specials.values().reduce(func(a, b): return a + b, 0),
+		"shots": s.shots, "wave": mission.get("wave") if mission.get("wave") != null else 0,
+	})
+	Analytics.set_state("debrief:" + String(episode.id))
 	state = State.DEBRIEF
 	hud.visible = false
 	Engine.time_scale = 1.0
@@ -459,6 +497,7 @@ func _pause() -> void:
 		return
 	_end_missile_cam()
 	state = State.PAUSED
+	Analytics.track("pause", {"episode_id": episode.id, "mission_s": int(mission.time) if mission else 0, "last_milestone": mission.last_milestone if mission else ""})
 	get_tree().paused = true
 	Sfx.set_engine(false, 0, 0)
 	menu.show_pause()
@@ -474,6 +513,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.INTRO:
 		var pressed := (event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton) and event.is_pressed()
 		if pressed and _intro_seq > 0.5:
+			Analytics.track("launch_skipped", {"at_s": snappedf(_intro_seq, 0.1)})
 			_finish_intro()
 		return
 	if event.is_action_pressed("pause"):

@@ -194,6 +194,26 @@ body { background: var(--ink); overflow: hidden; touch-action: none; font-family
 	.anim, .burst, .jet-wrap, .p-main .speed, .sheet, .loading .bar i { animation: none !important; }
 }
 		</style>
+		<!-- Google tag (gtag.js). Analytics is skipped when the browser sends Do Not Track.
+		     Game events go through window.skTrack (scripts/autoload/analytics.gd). Forks: swap the ID. -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-2Y4QBD4HGN"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			if (navigator.doNotTrack === '1' || window.doNotTrack === '1') {
+				window['ga-disable-G-2Y4QBD4HGN'] = true;
+			}
+			gtag('js', new Date());
+			gtag('config', 'G-2Y4QBD4HGN');
+			window.skState = 'loading';
+			window.skTrack = function (name, params) {
+				try { gtag('event', name, params || {}); } catch (e) { /* analytics must never break the game */ }
+			};
+			// Where players drop off: the last known game state when the page goes away.
+			window.addEventListener('pagehide', function () {
+				window.skTrack('game_exit', { last_state: window.skState, transport_type: 'beacon' });
+			});
+		</script>
 		$GODOT_HEAD_INCLUDE
 	</head>
 	<body>
@@ -448,6 +468,7 @@ window.skLauncher = (function () {
 	document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !back.hidden) closeSheet(); });
 
 	function controls() {
+		if (window.skTrack) window.skTrack('controls_opened');
 		const rows = CONTROLS.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))));
 		openSheet(
 			el('h2', {}, 'Controls'),
@@ -457,6 +478,7 @@ window.skLauncher = (function () {
 	}
 
 	function settings() {
+		if (window.skTrack) window.skTrack('settings_opened');
 		const toggle = (key, title, hint) => {
 			const box = el('input', { type: 'checkbox' });
 			box.checked = !!state.settings[key];

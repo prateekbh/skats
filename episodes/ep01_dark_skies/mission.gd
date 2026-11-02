@@ -144,12 +144,14 @@ func update(_dt: float) -> void:
 			if enemies_alive() == 0:
 				_advancing = true
 				message("WAVE CLEARED")
-				after(1.5, func(): cutscene(strips()["wave1"], _start_wave_2))
+				milestone("wave_1_cleared")
+				after(1.5, func(): cutscene(strips()["wave1"], _start_wave_2, "wave1"))
 		Phase.WAVE_2:
 			if enemies_alive() == 0:
 				_advancing = true
 				message("WAVE CLEARED")
-				after(1.5, func(): cutscene(strips()["wave2"], _start_boss))
+				milestone("wave_2_cleared")
+				after(1.5, func(): cutscene(strips()["wave2"], _start_boss, "wave2"))
 
 
 func _start_wave_2() -> void:
@@ -172,6 +174,7 @@ func _scrambler_in_flight() -> bool:
 
 func _start_boss() -> void:
 	phase = Phase.BOSS_SHIELD
+	milestone("boss_started")
 	main.player.lock_special("scrambler", true) # not before the cutscene
 	var jet := DarkKatJet.new()
 	jet.anchor = main.city.enforcer_hq_pos + Vector3(0, 450, 0)
@@ -195,11 +198,13 @@ func _on_shield_proven() -> void:
 	if phase != Phase.BOSS_SHIELD:
 		return
 	phase = Phase.BOSS_SCRAMBLE
-	after(0.9, func(): cutscene(strips()["shield"], _arm_scramblers))
+	milestone("shield_proven")
+	after(0.9, func(): cutscene(strips()["shield"], _arm_scramblers, "shield"))
 
 
 func _arm_scramblers() -> void:
 	boss.scramble_ready = true
+	milestone("scramblers_armed")
 	main.player.unlock_and_select("scrambler", 2)
 	message("SCRAMBLER MISSILES ARMED: 2 SHOTS", 3.5)
 	Sfx.play("beep", -4.0, 1.2)
@@ -210,6 +215,7 @@ func _on_shield_broken() -> void:
 	if phase != Phase.BOSS_SCRAMBLE:
 		return
 	phase = Phase.BOSS_OPEN
+	milestone("shield_down")
 	main.slow_motion(0.8)
 	message("SHIELD DOWN", 3.0)
 	radio("Razor", "Shield's fried! Everything we've got works on him now. Hit him!", 4.0)
@@ -218,7 +224,8 @@ func _on_shield_broken() -> void:
 
 func _on_boss_destroyed(_t: Target) -> void:
 	phase = Phase.OUTRO
+	milestone("boss_destroyed")
 	main.slow_motion(1.6)
 	message("DARK KAT'S JET DESTROYED", 3.5)
 	radio("T-Bone", "Bill it to the salvage yard, creep.", 3.0, "grin")
-	after(4.5, func(): cutscene(strips()["epilogue"], win))
+	after(4.5, func(): cutscene(strips()["epilogue"], win, "epilogue"))

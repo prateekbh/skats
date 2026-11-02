@@ -66,6 +66,7 @@ func record_score(id: String, score: int) -> bool:
 
 func set_muted(value: bool) -> void:
 	muted = value
+	Analytics.track("setting_changed", {"name": "muted", "value": muted})
 	AudioServer.set_bus_mute(0, muted)
 	Music.set_muted(muted)
 	_save()
@@ -73,11 +74,13 @@ func set_muted(value: bool) -> void:
 
 func toggle_missile_cam() -> void:
 	missile_cam = not missile_cam
+	Analytics.track("setting_changed", {"name": "missile_cam", "value": missile_cam})
 	_save()
 
 
 func toggle_invert() -> void:
 	invert_pitch = not invert_pitch
+	Analytics.track("setting_changed", {"name": "invert_pitch", "value": invert_pitch})
 	_save()
 
 
