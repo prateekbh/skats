@@ -58,6 +58,7 @@ jobs:
           # Launch-screen character art is served next to index.html.
           mkdir -p build/web/launch
           cp web/launch/*.png web/launch/*.svg web/launch/*.mp3 build/web/launch/
+          cp CNAME build/web/ # keeps the custom domain on every deploy
 
       - uses: actions/upload-pages-artifact@v3
         with:
