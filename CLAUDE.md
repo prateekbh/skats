@@ -67,6 +67,8 @@ single-threaded web export). See `README.md` for layout and `docs/GDD.md` for de
   `Game.touch_mode` switches on from a coarse-pointer browser or the first touch (and unbinds the mouse buttons, since touches also arrive as
   emulated clicks). The portrait "rotate" screen lives in `web/shell.html` and pauses the game via `WebLauncher.portrait_changed`.
   `--autotest --god --touch` shows the controls, `--touchtest` drives them with synthetic fingers.
+- Launcher on phones: `node tools/launcher_shot.js out.png ["Pixel 7"|"iPhone SE"|"Desktop Chrome"]` screenshots `web/shell.html` on a device profile
+  without the engine (Playwright). Short screens use the `@media (max-height: 520px)` rules in the shell; check it after changing the launcher.
 - Analytics: `Analytics.track(event, params)` (`scripts/autoload/analytics.gd`, web only, GA4 via `window.skTrack` in the shell); missions add funnel
   steps with `milestone("name")`. Add events for new journey steps and list them in `docs/ANALYTICS.md`; `--analytics-log` prints them.
 - Keep the web budget in mind: one MultiMesh per bullet type, no real-time shadows, and no nodes
