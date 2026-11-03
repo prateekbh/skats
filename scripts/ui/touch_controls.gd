@@ -16,8 +16,9 @@ extends Control
 
 signal pause_requested
 
-const DEADZONE := 0.1
-const STICK_RADIUS := 105.0 # in ui units (see _ui)
+const DEADZONE := 0.16
+const STICK_RADIUS := 150.0 # in ui units (see _ui): more thumb travel for the same turn
+const STICK_CURVE := 1.9 # >1 keeps small movements gentle and saves full deflection for the edge
 const SWIPE_STEP := 52.0 # ui units of sideways travel per carousel step
 const TAP_SLOP := 20.0 # a touch on the carousel that moved less than this (ui units) is a tap
 
@@ -199,7 +200,7 @@ func _shape(v: float) -> float:
 	var a := absf(v)
 	if a < DEADZONE:
 		return 0.0
-	return signf(v) * pow((a - DEADZONE) / (1.0 - DEADZONE), 1.25)
+	return signf(v) * pow((a - DEADZONE) / (1.0 - DEADZONE), STICK_CURVE)
 
 
 func _process(delta: float) -> void:

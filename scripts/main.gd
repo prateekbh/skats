@@ -1193,7 +1193,7 @@ func _touch_test_step() -> void:
 	if step == 0 and e > 0.3:
 		_touch_event(0, Vector2(sl.x, sl.top + 10.0), true) # throttle to the top
 		_touch_event(1, Vector2(w.x * 0.75, w.y * 0.5), true) # stick down
-		_touch_event(1, Vector2(w.x * 0.75 + 110.0, w.y * 0.5), true, true) # drag right
+		_touch_event(1, Vector2(w.x * 0.75 + 150.0, w.y * 0.5), true, true) # drag right
 		_tt.step = 1
 	elif step == 1 and e > 2.5:
 		_tt["roll_right_y"] = player.global_transform.basis.x.y
