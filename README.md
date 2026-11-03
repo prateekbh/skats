@@ -35,6 +35,11 @@ arcade jet combat, lock-on missiles and big set-piece bosses, playable in a web 
 
 Missiles lock on by themselves: keep a target in front of you until the diamond turns red.
 
+**Touch (phones and tablets, landscape only):** left thumb: a throttle slider, FIRE (hold), BOOST (hold),
+MISSILE (homing), SPECIAL (fire the selected special) and NEXT. Right thumb: drag anywhere on the right half
+to steer (pitch and roll; banking turns the nose). Held upright, the page shows a "rotate your device" screen
+and the game pauses. The launcher has a Fullscreen button on touch devices.
+
 ## What's in v0.1
 
 - **The TurboKat:** a community 3D model painted in the show's colours (glossy black, red cockpit pod with royal-blue glass, blue wingtips and nose, red engines with spinning turbines). Its wings swing back at high speed and spread open when slow, and it's cel-shaded with cartoon outlines. A procedural fallback airframe is built if the model files are missing.

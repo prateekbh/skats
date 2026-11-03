@@ -211,6 +211,16 @@ body { background: var(--ink); overflow: hidden; touch-action: none; font-family
 @media (prefers-reduced-motion: reduce) {
 	.anim, .burst, .jet-wrap, .p-main .speed, .sheet, .loading .bar i { animation: none !important; }
 }
+/* Touch devices held upright: the game only plays in landscape, so cover it with a rotate screen. */
+#rotate { display: none; position: fixed; inset: 0; z-index: 100000; background: var(--ink); color: #fff; text-align: center;
+	flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 24px; font-family: 'Bangers', 'Comic Sans MS', sans-serif; }
+#rotate .phone { width: 74px; height: 120px; border: 8px solid #ffd21f; border-radius: 16px; position: relative; animation: rot 2.4s ease-in-out infinite; box-shadow: 5px 6px 0 #000; }
+#rotate .phone::after { content: ""; position: absolute; left: 50%; bottom: 8px; width: 18px; height: 5px; margin-left: -9px; background: #ffd21f; border-radius: 3px; }
+#rotate h1 { font-size: clamp(34px, 9vw, 64px); font-weight: normal; letter-spacing: 2px; color: #ffd21f; text-shadow: 4px 4px 0 #e0261a; }
+#rotate p { font-family: 'Comic Neue', sans-serif; font-weight: 700; font-size: clamp(16px, 4.4vw, 24px); max-width: 22em; }
+@keyframes rot { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+@media (prefers-reduced-motion: reduce) { #rotate .phone { animation: none; transform: rotate(-90deg); } }
 		</style>
 		<!-- Google tag (gtag.js). Analytics is skipped when the browser sends Do Not Track.
 		     Game events go through window.skTrack (scripts/autoload/analytics.gd). Forks: swap the ID. -->
@@ -231,10 +241,26 @@ body { background: var(--ink); overflow: hidden; touch-action: none; font-family
 			window.addEventListener('pagehide', function () {
 				window.skTrack('game_exit', { last_state: window.skState, transport_type: 'beacon' });
 			});
+			// Touch devices must play in landscape: the page covers the game when held upright and
+			// tells the game (which pauses). Where the browser allows it (fullscreen on Android), lock the orientation.
+			(function () {
+				const mq = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
+				const notify = function () {
+					window.skPortrait = mq.matches;
+					if (mq.matches && window.skTrack) window.skTrack('portrait_shown', { last_state: window.skState });
+					if (window.skGamePortrait) window.skGamePortrait(mq.matches);
+				};
+				notify();
+				if (mq.addEventListener) mq.addEventListener('change', notify); else if (mq.addListener) mq.addListener(notify);
+				window.skLockLandscape = function () {
+					try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {}); } catch (e) { /* not supported */ }
+				};
+			})();
 		</script>
 		$GODOT_HEAD_INCLUDE
 	</head>
 	<body>
+		<div id="rotate" role="alert"><div class="phone"></div><h1>Rotate your device</h1><p>SWAT Kats: Megakat Skies flies in landscape. Turn your phone sideways to keep playing.</p></div>
 		<canvas id="canvas" tabindex="0">Your browser does not support the canvas tag.</canvas>
 		<noscript>Your browser does not support JavaScript.</noscript>
 		<img id="status-splash" class="$GODOT_SPLASH_CLASSES" src="$GODOT_SPLASH" alt="">
@@ -463,9 +489,13 @@ window.skLauncher = (function () {
 		soon.forEach((ep) => {
 			menu.append(el('button', { class: 'soon', type: 'button', disabled: '' }, el('span', {}, ep.number + ' · ' + ep.title), el('span', {}, 'Soon')));
 		});
-		menu.append(el('div', { class: 'row' },
+		const row = el('div', { class: 'row' },
 			el('button', { type: 'button', onclick: controls }, 'Controls'),
-			el('button', { type: 'button', onclick: settings }, 'Settings')));
+			el('button', { type: 'button', onclick: settings }, 'Settings'));
+		if (window.matchMedia('(pointer: coarse)').matches && document.documentElement.requestFullscreen) {
+			row.append(el('button', { type: 'button', onclick: fullscreen }, 'Fullscreen'));
+		}
+		menu.append(row);
 		menu.querySelectorAll('button:not(.soon)').forEach((b) => {
 			if (!ready && !b.closest('.row')) b.disabled = true;
 		});
@@ -485,8 +515,24 @@ window.skLauncher = (function () {
 	back.addEventListener('click', (ev) => { if (ev.target === back) closeSheet(); });
 	document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !back.hidden) closeSheet(); });
 
+	function fullscreen() {
+		if (window.skTrack) window.skTrack('fullscreen_clicked');
+		const go = document.documentElement.requestFullscreen();
+		(go && go.then ? go : Promise.resolve()).then(() => { if (window.skLockLandscape) window.skLockLandscape(); }).catch(() => {});
+	}
+
 	function controls() {
 		if (window.skTrack) window.skTrack('controls_opened');
+		const touch = window.matchMedia('(pointer: coarse)').matches;
+		if (touch) {
+			openSheet(
+				el('h2', {}, 'Touch controls'),
+				el('p', {}, 'Left thumb: drag the THROTTLE slider, hold FIRE for guns, hold BOOST for the afterburner, tap MISSILE for a homing missile and SPECIAL to fire the selected special missile (NEXT swaps it).'),
+				el('p', {}, 'Right thumb: drag anywhere on the right half of the screen to steer. Up and down pitch, left and right roll and bank into turns.'),
+				el('p', {}, 'Play in landscape. Tap Fullscreen on the menu for more room.'),
+				el('div', { class: 'actions' }, el('button', { type: 'button', onclick: closeSheet }, 'Got it')));
+			return;
+		}
 		const rows = CONTROLS.map((r) => el('tr', {}, ...r.map((c) => el('td', {}, c))));
 		openSheet(
 			el('h2', {}, 'Controls'),

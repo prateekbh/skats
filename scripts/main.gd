@@ -67,6 +67,8 @@ func _ready() -> void:
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		_opts[kv[0]] = kv[1] if kv.size() > 1 else "true"
 	_autotest = _opts.has("autotest")
+	if _opts.has("touch") or _opts.has("touchtest"):
+		Game.set_touch_mode(true) # --touch: show the on-screen controls; --touchtest: also drive them
 	if _opts.has("shot-every"):
 		_shot_times.clear()
 		var every := float(_opts["shot-every"])
@@ -187,6 +189,15 @@ func _build_ui() -> void:
 	hud.visible = false
 	layer.add_child(hud)
 	combat.on_message = func(t: String): hud.message(t, 2.0)
+	touch = TouchControls.new()
+	touch.main = self
+	touch.visible = false
+	layer.add_child(touch)
+	touch.pause_requested.connect(func(): if state == State.PLAYING: _pause())
+	WebLauncher.portrait_changed.connect(func(portrait: bool):
+		if portrait and state == State.PLAYING:
+			Analytics.track("portrait_pause", {"episode_id": episode.id})
+			_pause())
 	menu = Menu.new()
 	layer.add_child(menu)
 	menu.launch.connect(launch_episode)
@@ -275,6 +286,7 @@ const MCAM_TIME := 1.1 # unscaled seconds
 var _mcam := {}
 ## The stage waiting for the hatch launch to finish.
 var _launch_ep := {}
+var touch: TouchControls
 var _loaded_sent := false
 ## Per-run counters reported with the mission result.
 var _run_stats := {"specials": {}, "fps_sampled": false}
@@ -392,7 +404,7 @@ func start_episode(ep: Dictionary, from_launch := false) -> void:
 	else:
 		var pose: Array = mission.start_pose()
 		player.reset(pose[0], pose[1])
-	player.player_control = keep and not _autotest
+	player.player_control = keep and (not _autotest or _opts.has("touchtest"))
 	player.ai = {"pitch": 0.0, "roll": 0.0, "yaw": 0.0, "throttle": 0.6, "fire": false, "missile": false}
 	camera.mode = ChaseCamera.Mode.CHASE
 	if keep:
@@ -539,6 +551,7 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if _flytest:
 		return
+	touch.visible = Game.touch_mode and state == State.PLAYING and not comic.is_active() and _intro_t <= 0.0 and (not _autotest or _opts.has("touchtest") or _opts.has("touch"))
 	if _slowmo_until > 0 and Time.get_ticks_msec() > _slowmo_until:
 		_slowmo_until = 0
 		Engine.time_scale = MCAM_SLOWMO if not _mcam.is_empty() else 1.0
@@ -554,11 +567,11 @@ func _process(delta: float) -> void:
 			if _intro_t > 0.0:
 				_intro_t -= delta
 				if _intro_t <= 0.0:
-					player.player_control = not _autotest
+					player.player_control = not _autotest or _opts.has("touchtest")
 					camera.shot = ""
 			if not _mcam.is_empty():
 				_missile_cam_step(delta / maxf(Engine.time_scale, 0.01))
-			if _autotest and _intro_t <= 0.0:
+			if _autotest and _intro_t <= 0.0 and not _opts.has("touchtest"):
 				_autopilot_fight()
 			mission.step(delta)
 			Sfx.set_engine(player.alive, player.throttle, 1.0 if player.boosting else 0.0)
@@ -1145,10 +1158,71 @@ func _weapon_test_step(delta: float) -> void:
 		print("[weapons] %-18s vs %-16s -> %s" % [def.name, tname, state_txt]))
 
 
+var _tt := {}
+
+
+func _touch_event(index: int, pos: Vector2, pressed: bool, drag := false) -> void:
+	var ev: InputEvent
+	if drag:
+		var d := InputEventScreenDrag.new()
+		d.index = index
+		d.position = pos
+		ev = d
+	else:
+		var t := InputEventScreenTouch.new()
+		t.index = index
+		t.position = pos
+		t.pressed = pressed
+		ev = t
+	Input.parse_input_event(ev)
+
+
+## --touchtest: drives TouchControls with synthetic fingers and checks the jet and weapons react.
+func _touch_test_step() -> void:
+	if state != State.PLAYING or _intro_t > 0.0 or touch == null or not touch.visible:
+		return
+	var t := _test_t
+	var sl: Dictionary = touch._slider()
+	var b: Dictionary = touch._buttons()
+	var w := touch._vs()
+	if not _tt.has("start"):
+		_tt = {"start": t, "throttle0": player.throttle, "ammo0": int(player.special_ammo.get("octopus", 0)), "shots0": combat.stats.shots, "step": 0}
+		player.god_mode = true
+	var e := t - float(_tt.start)
+	var step: int = _tt.step
+	if step == 0 and e > 0.3:
+		_touch_event(0, Vector2(sl.x, sl.top + 10.0), true) # throttle to the top
+		_touch_event(1, Vector2(w.x * 0.75, w.y * 0.5), true) # stick down
+		_touch_event(1, Vector2(w.x * 0.75 + 110.0, w.y * 0.5), true, true) # drag right
+		_tt.step = 1
+	elif step == 1 and e > 2.5:
+		_tt["roll_right_y"] = player.global_transform.basis.x.y
+		_tt["throttle1"] = player.throttle
+		_touch_event(2, b.fire.c, true)
+		_tt.step = 2
+	elif step == 2 and e > 3.5:
+		_tt["shots1"] = combat.stats.shots
+		_touch_event(2, b.fire.c, false)
+		_touch_event(3, b.special.c, true)
+		_touch_event(3, b.special.c, false)
+		_tt.step = 3
+	elif step == 3 and e > 4.2:
+		var ok_throttle: bool = float(_tt.throttle1) > float(_tt.throttle0) + 0.1 or float(_tt.throttle1) > 0.95
+		var ok_roll: bool = absf(float(_tt.roll_right_y)) > 0.15
+		var ok_guns: bool = int(_tt.shots1) > int(_tt.shots0)
+		var ok_special: bool = int(player.special_ammo.get("octopus", 0)) < int(_tt.ammo0)
+		print("[touchtest] throttle %.2f->%.2f %s | roll %.2f %s | guns shots %d->%d %s | special ammo %d->%d %s" % [
+			_tt.throttle0, _tt.throttle1, "OK" if ok_throttle else "FAIL", _tt.roll_right_y, "OK" if ok_roll else "FAIL",
+			_tt.shots0, _tt.shots1, "OK" if ok_guns else "FAIL", _tt.ammo0, int(player.special_ammo.get("octopus", 0)), "OK" if ok_special else "FAIL"])
+		get_tree().quit(0 if (ok_throttle and ok_roll and ok_guns and ok_special) else 3)
+
+
 func _autotest_step(delta: float) -> void:
 	_test_t += delta / maxf(Engine.time_scale, 0.01)
 	if _opts.has("weapons"):
 		_weapon_test_step(delta)
+	if _opts.has("touchtest"):
+		_touch_test_step()
 	# Dogfight metric: how long an attacker sits behind the player without a break.
 	if state == State.PLAYING and hud._bandit_on_six(player) != null:
 		_six_t += delta

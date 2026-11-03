@@ -8,6 +8,8 @@ extends Node
 ## Game -> page: window.skLauncher.show(state_json), window.skLauncher.hide()
 
 signal launch_requested(episode_id: String)
+## The page tells us when a touch device is held upright (the page shows a "rotate your device" screen).
+signal portrait_changed(portrait: bool)
 
 var active := false
 ## JavaScript callbacks must be kept alive for as long as the page may call them.
@@ -21,9 +23,13 @@ func _ready() -> void:
 	var win = JavaScriptBridge.get_interface("window")
 	var launch_cb = JavaScriptBridge.create_callback(_on_launch)
 	var setting_cb = JavaScriptBridge.create_callback(_on_setting)
-	_callbacks = [launch_cb, setting_cb]
+	var portrait_cb = JavaScriptBridge.create_callback(func(args: Array): portrait_changed.emit(bool(args[0]) if args.size() > 0 else false))
+	_callbacks = [launch_cb, setting_cb, portrait_cb]
 	win.skGameLaunch = launch_cb
 	win.skGameSetting = setting_cb
+	win.skGamePortrait = portrait_cb
+	if bool(JavaScriptBridge.eval("!!window.skPortrait", true)):
+		portrait_changed.emit(true)
 
 
 ## Brings the launcher up with the current episodes, best scores and settings.

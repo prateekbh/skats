@@ -20,6 +20,9 @@ var muted := false
 ## Cinematic camera that follows special missiles.
 var missile_cam := true
 var best_scores := {}
+## True on phones and tablets: the on-screen controls (TouchControls) are shown while flying.
+## Set from a coarse-pointer browser at start, or by the first screen touch.
+var touch_mode := false
 
 
 func _init() -> void:
@@ -36,6 +39,27 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_input()
 	_load()
+	if OS.has_feature("web") and bool(JavaScriptBridge.eval("window.matchMedia('(pointer: coarse)').matches", true)):
+		set_touch_mode(true)
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and not touch_mode:
+		set_touch_mode(true)
+
+
+## Touches also arrive as emulated mouse clicks, which would fire the guns and missiles: once the
+## on-screen controls are in use, the mouse buttons stop being bound to them.
+func set_touch_mode(on: bool) -> void:
+	if touch_mode == on:
+		return
+	touch_mode = on
+	if on:
+		for a in ["fire_guns", "fire_missile"]:
+			for ev in InputMap.action_get_events(a):
+				if ev is InputEventMouseButton:
+					InputMap.action_erase_event(a, ev)
+		Analytics.track("touch_mode_on")
 
 
 func episode_by_id(id: String) -> Dictionary:

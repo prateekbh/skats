@@ -23,6 +23,8 @@ if [ "${1:-}" != "quick" ]; then
 	echo "== boss fight (win path, then the game-over path)"
 	godot --headless --path . -- --autotest --god --boss --seconds=60 2>&1 | grep -q "win=true" || { echo "boss win path failed"; fail=1; }
 	godot --headless --path . -- --autotest --god --boss --bossmiss --seconds=40 2>&1 | grep -q "win=false" || { echo "boss game-over path failed"; fail=1; }
+	echo "== touch controls (synthetic fingers: throttle, steering, guns, special missile)"
+	godot --headless --path . -- --autotest --god --touchtest --seconds=20 2>&1 | grep -q "special ammo.*OK" && ! godot --headless --path . -- --autotest --god --touchtest --seconds=20 2>&1 | grep -q "FAIL" || { echo "touch test failed"; fail=1; }
 	echo "== city: every street and avenue flyable"
 	godot --headless --path . -- --flytest 2>&1 | grep -q "17 of 17 lanes flown clean" || { echo "flytest failed (see CLAUDE.md for --flytest)"; fail=1; }
 fi

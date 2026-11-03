@@ -235,7 +235,10 @@ func _draw() -> void:
 	if p.warn_boundary and blink:
 		_text(Vector2(c.x - 250, wy), "RETURN TO MEGAKAT CITY", 22, AMBER, HORIZONTAL_ALIGNMENT_CENTER, 500)
 
-	_draw_radar(p, Vector2(110 * ui + 10, vs.y - 110 * ui - 10), 95 * ui)
+	if Game.touch_mode:
+		_draw_radar(p, Vector2(vs.x - 72 * ui - 10, 208 * ui), 60 * ui) # bottom-left is the thumb zone, top-left the radio cards
+	else:
+		_draw_radar(p, Vector2(110 * ui + 10, vs.y - 110 * ui - 10), 95 * ui)
 	_draw_status(p, Vector2(vs.x - 300 * ui - 20, vs.y - 150 * ui - 10), ui)
 
 
