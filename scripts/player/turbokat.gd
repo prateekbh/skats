@@ -258,12 +258,8 @@ func _weapons(dt: float) -> void:
 		_missile_side = -_missile_side
 		var pos := global_transform * Vector3(4.0 * _missile_side, -1.2, -0.5)
 		combat.fire_missile(pos, forward(), speed, lock_target if locked else null)
-	if player_control and Input.is_action_just_pressed("cycle_special") and Arsenal.SPECIALS.size() > 1:
-		for k in Arsenal.SPECIALS.size():
-			special_index = (special_index + 1) % Arsenal.SPECIALS.size()
-			if not locked_specials.has(selected_special().id):
-				break
-		Sfx.play("beep", -8.0, 0.8) # the HUD carousel turns to the new card
+	if player_control and Input.is_action_just_pressed("cycle_special"):
+		cycle_special(1)
 	var special := selected_special()
 	var want_special: bool = Input.is_action_just_pressed("fire_special") if player_control else ai.get("special", false)
 	ai.special = false
@@ -469,6 +465,18 @@ func crash() -> void:
 	_damage_smoke.emitting = false
 	combat.explode(global_position, 2.6)
 	destroyed.emit()
+
+
+## Selects the next (step 1) or previous (step -1) special that isn't locked.
+func cycle_special(step: int) -> void:
+	var n := Arsenal.SPECIALS.size()
+	if n < 2:
+		return
+	for k in n:
+		special_index = posmod(special_index + step, n)
+		if not locked_specials.has(selected_special().id):
+			break
+	Sfx.play("beep", -8.0, 0.8) # the carousel turns to the new card
 
 
 ## Takes a special off the rack (or puts it back) and, when unlocking, selects it with `ammo` rounds.

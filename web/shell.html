@@ -284,6 +284,25 @@ body { background: var(--ink); overflow: hidden; touch-action: none; font-family
 				};
 				notify();
 				if (mq.addEventListener) mq.addEventListener('change', notify); else if (mq.addListener) mq.addListener(notify);
+				// Touch devices always play fullscreen: entered when a stage is launched (that tap is the
+				// gesture browsers require) and re-entered by the next touch if the player leaves it.
+				// iPhone Safari has no fullscreen API for pages, so there it stays as is.
+				const coarse = window.matchMedia('(pointer: coarse)').matches;
+				let wanted = false;
+				window.skEnterFullscreen = function (want) {
+					if (!coarse) return;
+					if (want) wanted = true;
+					const el = document.documentElement;
+					if (!wanted || document.fullscreenElement || !el.requestFullscreen) return;
+					try {
+						const go = el.requestFullscreen({ navigationUI: 'hide' });
+						if (go && go.then) go.then(function () {
+							if (window.skTrack) window.skTrack('fullscreen_entered');
+							window.skLockLandscape();
+						}).catch(function () {});
+					} catch (e) { /* not allowed right now */ }
+				};
+				document.addEventListener('touchend', function () { window.skEnterFullscreen(false); }, { passive: true });
 				window.skLockLandscape = function () {
 					try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {}); } catch (e) { /* not supported */ }
 				};
@@ -524,9 +543,6 @@ window.skLauncher = (function () {
 		const row = el('div', { class: 'row' },
 			el('button', { type: 'button', onclick: controls }, 'Controls'),
 			el('button', { type: 'button', onclick: settings }, 'Settings'));
-		if (window.matchMedia('(pointer: coarse)').matches && document.documentElement.requestFullscreen) {
-			row.append(el('button', { type: 'button', onclick: fullscreen }, 'Fullscreen'));
-		}
 		menu.append(row);
 		menu.querySelectorAll('button:not(.soon)').forEach((b) => {
 			if (!ready && !b.closest('.row')) b.disabled = true;
@@ -547,21 +563,15 @@ window.skLauncher = (function () {
 	back.addEventListener('click', (ev) => { if (ev.target === back) closeSheet(); });
 	document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !back.hidden) closeSheet(); });
 
-	function fullscreen() {
-		if (window.skTrack) window.skTrack('fullscreen_clicked');
-		const go = document.documentElement.requestFullscreen();
-		(go && go.then ? go : Promise.resolve()).then(() => { if (window.skLockLandscape) window.skLockLandscape(); }).catch(() => {});
-	}
-
 	function controls() {
 		if (window.skTrack) window.skTrack('controls_opened');
 		const touch = window.matchMedia('(pointer: coarse)').matches;
 		if (touch) {
 			openSheet(
 				el('h2', {}, 'Touch controls'),
-				el('p', {}, 'Left thumb: drag the THROTTLE slider, hold FIRE for guns, hold BOOST for the afterburner, tap MISSILE for a homing missile and SPECIAL to fire the selected special missile (NEXT swaps it).'),
+				el('p', {}, 'Left thumb: drag the THROTTLE slider, tap the flame on top of it for BOOST (hold), hold the gun icon to fire, tap the small missile icon for a homing missile. The round picture is your special missile: tap it to fire, swipe it sideways to change.'),
 				el('p', {}, 'Right thumb: drag anywhere on the right half of the screen to steer. Up and down pitch, left and right roll and bank into turns.'),
-				el('p', {}, 'Play in landscape. Tap Fullscreen on the menu for more room.'),
+				el('p', {}, 'The game goes fullscreen and plays in landscape.'),
 				el('div', { class: 'actions' }, el('button', { type: 'button', onclick: closeSheet }, 'Got it')));
 			return;
 		}
@@ -594,6 +604,7 @@ window.skLauncher = (function () {
 
 	function launch(ep) {
 		back.hidden = true;
+		if (window.skEnterFullscreen) window.skEnterFullscreen(true);
 		hide();
 		if (window.skGameLaunch) window.skGameLaunch(ep.id);
 	}

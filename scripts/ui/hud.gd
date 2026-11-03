@@ -415,7 +415,8 @@ func _draw_status(p: TurboKat, o: Vector2, ui: float) -> void:
 	_bar(o + Vector2(0, 68 * ui), w, "GUN HEAT", p.heat / 100.0, RED if p.overheated else AMBER, ui)
 	var y := o.y + 110 * ui
 	_text(Vector2(o.x, y), "[F] BLOWTORCH  %02d" % p.missiles, 16, GREEN, HORIZONTAL_ALIGNMENT_LEFT)
-	_draw_rack(p, Vector2(o.x, o.y - 50 * ui), w, ui)
+	if not Game.touch_mode: # on touch the round missile carousel (TouchControls) replaces it
+		_draw_rack(p, Vector2(o.x, o.y - 50 * ui), w, ui)
 	var lock_txt := "LOCKED" if p.locked else ("LOCKING" if p.lock_target else "NO LOCK")
 	_text(Vector2(o.x, y + 24 * ui), lock_txt, 13, RED if p.locked else GREEN_DIM, HORIZONTAL_ALIGNMENT_LEFT)
 

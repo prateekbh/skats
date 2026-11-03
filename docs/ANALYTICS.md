@@ -26,7 +26,7 @@ events below (GA4's own standard web measurement also applies on the hosted page
 | Stops mid-fight | `pause` | `mission_s`, `last_milestone` |
 | Result | `mission_end` | `result` (win/lose), `reason`, `mission_s`, `score`, `kills`, `accuracy`, `hull`, `rank`, `last_milestone`, `specials_fired`, `attempt` |
 | What next | `retry`, `quit_to_menu` | `from` (pause/debrief), `next_attempt` |
-| Touch devices | `touch_mode_on`, `portrait_shown`, `portrait_pause`, `fullscreen_clicked` | `last_state` |
+| Touch devices | `touch_mode_on`, `portrait_shown`, `portrait_pause`, `fullscreen_entered` | `last_state` |
 | Closes the tab | `game_exit` | `last_state` (e.g. `playing:ep01`, `debrief:ep01`) |
 
 Every event also carries `session_s` (seconds since the game loaded).

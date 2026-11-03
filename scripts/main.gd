@@ -1203,14 +1203,20 @@ func _touch_test_step() -> void:
 	elif step == 2 and e > 3.5:
 		_tt["shots1"] = combat.stats.shots
 		_touch_event(2, b.fire.c, false)
-		_touch_event(3, b.special.c, true)
+		_touch_event(3, b.special.c, true) # tap the round carousel to fire
 		_touch_event(3, b.special.c, false)
 		_tt.step = 3
-	elif step == 3 and e > 4.2:
+	elif step == 3 and e > 4.3:
+		_tt["idx0"] = player.special_index
+		_touch_event(4, b.special.c, true)
+		_touch_event(4, b.special.c + Vector2(touch._ui() * 120.0, 0), true, true) # swipe it to change
+		_touch_event(4, b.special.c + Vector2(touch._ui() * 120.0, 0), false)
+		_tt.step = 4
+	elif step == 4 and e > 5.0:
 		var ok_throttle: bool = float(_tt.throttle1) > float(_tt.throttle0) + 0.1 or float(_tt.throttle1) > 0.95
 		var ok_roll: bool = absf(float(_tt.roll_right_y)) > 0.15
 		var ok_guns: bool = int(_tt.shots1) > int(_tt.shots0)
-		var ok_special: bool = int(player.special_ammo.get("octopus", 0)) < int(_tt.ammo0)
+		var ok_special: bool = int(player.special_ammo.get("octopus", 0)) < int(_tt.ammo0) and player.special_index != int(_tt.idx0)
 		print("[touchtest] throttle %.2f->%.2f %s | roll %.2f %s | guns shots %d->%d %s | special ammo %d->%d %s" % [
 			_tt.throttle0, _tt.throttle1, "OK" if ok_throttle else "FAIL", _tt.roll_right_y, "OK" if ok_roll else "FAIL",
 			_tt.shots0, _tt.shots1, "OK" if ok_guns else "FAIL", _tt.ammo0, int(player.special_ammo.get("octopus", 0)), "OK" if ok_special else "FAIL"])

@@ -35,10 +35,10 @@ arcade jet combat, lock-on missiles and big set-piece bosses, playable in a web 
 
 Missiles lock on by themselves: keep a target in front of you until the diamond turns red.
 
-**Touch (phones and tablets, landscape only):** left thumb: a throttle slider, FIRE (hold), BOOST (hold),
-MISSILE (homing), SPECIAL (fire the selected special) and NEXT. Right thumb: drag anywhere on the right half
+**Touch (phones and tablets, landscape only):** left thumb: a throttle slider with the BOOST flame on top (hold), a gun icon (hold to fire),
+MISSILE (homing) and a round special-missile carousel (tap to fire, swipe to change). Right thumb: drag anywhere on the right half
 to steer (pitch and roll; banking turns the nose). Held upright, the page shows a "rotate your device" screen
-and the game pauses. The launcher has a Fullscreen button on touch devices.
+and the game pauses. Touch devices go fullscreen when a stage is launched.
 
 ## What's in v0.1
 
