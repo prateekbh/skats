@@ -5,6 +5,8 @@ shader_type spatial;
 // swallow them.
 
 uniform vec4 albedo : source_color = vec4(1.0);
+// Multiply by the mesh's vertex colours (painted regions on sculpted creatures, see Sculpt).
+uniform bool use_vertex_color = false;
 // Colour multiplier in the shadow band (a cool tint reads better than plain grey).
 uniform vec4 shadow_tint : source_color = vec4(0.42, 0.42, 0.58, 1.0);
 // Where the bright band starts (0..1 on N·L) and how soft the band edges are.
@@ -23,7 +25,7 @@ uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_energy = 0.0;
 
 void fragment() {
-	ALBEDO = albedo.rgb;
+	ALBEDO = albedo.rgb * (use_vertex_color ? COLOR.rgb : vec3(1.0));
 	EMISSION = emission_color.rgb * emission_energy;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
