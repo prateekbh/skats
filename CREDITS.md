@@ -24,6 +24,10 @@ very grateful to its editors and contributors. We use it for:
 - **TurboKat 3D model:** "TurboKat from Swat Kats Fixed STL" by RabbitXGT
   (https://www.thingiverse.com/thing:4500382), based on Captain_Ahab_62's model, CC BY. Converted and
   painted for the game; see `assets/turbokat/README.md`.
+- **Episode 2 boss dinosaur:** "Tyrannosaurus rex" by IagoMendez
+  (https://sketchfab.com/3d-models/tyrannosaurus-rex-497a7f22e77a4678b173fb511bea6064), CC BY 4.0.
+  Recoloured in darker greens and cel-shaded for the game by `tools/prepare_rex.py`
+  (source: `tools/model_src/tyrannosaurus_rex.glb`).
 - **T-Bone and Razor launch-screen poster:** fan art signed "Feno 2011".
 - **Launch-screen character art and logo:** SWAT Kats artwork (processed by `tools/prepare_launch_art.py`).
 - **Fonts:** Bangers (Vernon Adams) and Comic Neue (Craig Rozynski), SIL Open Font License

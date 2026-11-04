@@ -5,6 +5,14 @@ extends Node3D
 ## arms, slate spikes down the back and a thick tail that curls up at the tip. Sculpted as smooth
 ## tubes (Sculpt) and cel-shaded with an ink outline. Nose points to -Z; the head is about 34 units
 ## up (scale it in game). Model only for now: it breathes and sways its tail.
+##
+## If models/rex.glb exists (made by tools/prepare_rex.py from a CC-BY Tyrannosaurus, see CREDITS.md)
+## that mesh is used instead, recoloured in darker greens and cel-shaded with the same ink outline;
+## the sculpted body below is the fallback.
+
+const MODEL := "res://episodes/ep02_the_pastmaster_always_rings_twice/models/rex.glb"
+## The imported mesh is about 5.9 units tall: scale it to the sculpted body's height.
+const MODEL_SCALE := 6.0
 
 const GREEN := Color(0.42, 0.66, 0.28)
 const GREEN_DARK := Color(0.3, 0.5, 0.22)
@@ -28,6 +36,9 @@ func _ready() -> void:
 func _build() -> void:
 	_body = Node3D.new()
 	add_child(_body)
+	if ResourceLoader.exists(MODEL):
+		_build_imported()
+		return
 	var skin := Sculpt.cel(Color(0.5, 0.6, 0.62), INK)
 	# The trunk: one smooth tube from the back of the head, down the upright torso, into the tail
 	# (the tail itself is a second tube on a pivot so it can sway).
@@ -60,6 +71,17 @@ func _build() -> void:
 		MeshKit.part(_body, arm, skin)
 		for k in 3:
 			_claw(_body, Vector3((5.0 + (k - 1) * 0.45) * sx, 20.4, -7.9), Vector3(0, -0.6, -0.8).normalized(), 0.28, 1.0)
+
+
+func _build_imported() -> void:
+	var scene: Node3D = (load(MODEL) as PackedScene).instantiate()
+	scene.scale = Vector3.ONE * MODEL_SCALE
+	_body.add_child(scene)
+	var skin := Sculpt.cel(Color(0.45, 0.55, 0.6), INK / MODEL_SCALE * 0.8, 0.12, 0.2)
+	skin.set_shader_parameter("gloss", 80.0) # small, crisp glints (a broad gloss reads as pale blotches on skin)
+	for mi in scene.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = skin
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _head(skin: Material) -> void:
