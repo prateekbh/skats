@@ -9,7 +9,7 @@ const SETTINGS_VERSION := 2
 ## `episode.gd` (menu card and briefing) and, for playable ones, a `mission.gd`, plus whatever
 ## code, shaders and art only that episode uses. Adding an episode = a new folder + one line here
 ## (the list is explicit so web exports never depend on scanning the packed file system).
-const EPISODE_FOLDERS: Array[String] = ["ep01_dark_skies", "ep02_turmoil_rising", "ep03_vipers_swamp", "free_flight"]
+const EPISODE_FOLDERS: Array[String] = ["ep01_dark_skies", "ep02_the_pastmaster_always_rings_twice", "ep03_vipers_swamp", "free_flight"]
 
 ## The episode cards, built from the folders above: {id, number, title, villain, story, objectives,
 ## playable, folder, script}. `script` is the folder's mission.gd (empty for coming-soon episodes).

@@ -761,6 +761,19 @@ func _view_shot() -> void:
 	camera.fov = float(_opts.get("fov", "68"))
 	camera.global_position = Vector3(c[0], c[1], c[2])
 	camera.look_at(Vector3(l[0], l[1], l[2]), Vector3.UP)
+	if _opts.has("propview"):
+		# --propview=<res://script.gd>[,more]: models (Node3D scripts) placed side by side at the look point.
+		# --propscale=<n> scales them; --propyaw=<deg> turns them; --propbig makes `big` variants.
+		var paths := String(_opts.propview).split(",")
+		for i in paths.size():
+			var prop: Node3D = load(paths[i]).new()
+			if _opts.has("propbig"):
+				prop.set("big", true)
+			world.add_child(prop)
+			prop.global_position = Vector3(l[0], l[1], l[2]) + Vector3(float(i) * float(_opts.get("propgap", "0")), 0, 0)
+			prop.scale = Vector3.ONE * float(_opts.get("propscale", "1"))
+			prop.rotation_degrees = Vector3(0, float(_opts.get("propyaw", "0")), 0)
+			prop.set_process(false) if _opts.has("freeze") else null
 	if _opts.has("jetview"):
 		# --jetview[=<boss script>]: Dark Kat's jet (or another boss) frozen at the look point, nose along -Z (or --jetyaw=<deg>).
 		var jet_path := String(_opts.jetview) if String(_opts.jetview).begins_with("res://") else "res://episodes/ep01_dark_skies/dark_kat_jet.gd"
